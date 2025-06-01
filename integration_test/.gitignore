@@ -1,0 +1,26 @@
+# Go module dependencies
+/go.sum
+
+# Local build files
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+
+# IDE specific files
+.idea/
+.vscode/
+.DS_Store 

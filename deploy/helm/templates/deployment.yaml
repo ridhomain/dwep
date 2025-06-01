@@ -1,0 +1,149 @@
+{{- /* deploy/helm/templates/deployment.yaml */ -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "daisi-wa-events-processor.fullname" . }}
+  labels:
+    {{- include "daisi-wa-events-processor.labels" . | nindent 4 }}
+  # Optional annotations can be added here
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "daisi-wa-events-processor.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "daisi-wa-events-processor.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "daisi-wa-events-processor.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      volumes: # Define volume from ConfigMap
+        - name: config-volume
+          configMap:
+            name: {{ include "daisi-wa-events-processor.fullname" . }}-config
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            # -- Base Application Settings --
+            - name: COMPANY_ID
+              value: {{ .Values.config.companyId | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: SERVER_PORT
+              value: {{ .Values.config.serverPort | quote }}
+            - name: METRICS_ENABLED
+              value: {{ .Values.config.metricsEnabled | quote }}
+            - name: DATABASE_POSTGRESAUTOMIGRATE
+              value: {{ .Values.config.databaseAutoMigrate | quote }}
+            # -- NATS Connection --
+            - name: NATS_URL
+              value: {{ .Values.config.nats.url | quote }}
+            # -- NATS Realtime Consumer Settings --
+            - name: NATS_REALTIME_MAXDELIVER
+              value: {{ .Values.config.nats.realtime.maxDeliver | quote }}
+            - name: NATS_REALTIME_NAKBASEDELAY
+              value: {{ .Values.config.nats.realtime.nakBaseDelay | quote }}
+            - name: NATS_REALTIME_NAKMAXDELAY
+              value: {{ .Values.config.nats.realtime.nakMaxDelay | quote }}
+            # -- NATS Historical Consumer Settings --
+            - name: NATS_HISTORICAL_MAXDELIVER
+              value: {{ .Values.config.nats.historical.maxDeliver | quote }}
+            - name: NATS_HISTORICAL_NAKBASEDELAY
+              value: {{ .Values.config.nats.historical.nakBaseDelay | quote }}
+            - name: NATS_HISTORICAL_NAKMAXDELAY
+              value: {{ .Values.config.nats.historical.nakMaxDelay | quote }}
+            # -- NATS DLQ Settings --
+            - name: NATS_DLQSTREAM
+              value: {{ .Values.config.nats.dlqStream | quote }}
+            - name: NATS_DLQSUBJECT
+              value: {{ .Values.config.nats.dlqSubject | quote }}
+            - name: NATS_DLQWORKERS
+              value: {{ .Values.config.nats.dlqWorkers | quote }}
+            - name: NATS_DLQBASEDELAYMINUTES
+              value: {{ .Values.config.nats.dlqBaseDelayMinutes | quote }}
+            - name: NATS_DLQMAXDELAYMINUTES
+              value: {{ .Values.config.nats.dlqMaxDelayMinutes | quote }}
+            - name: NATS_DLQMAXAGEDAYS
+              value: {{ .Values.config.nats.dlqMaxAgeDays | quote }}
+            - name: NATS_DLQMAXDELIVER
+              value: {{ .Values.config.nats.dlqMaxDeliver | quote }}
+            - name: NATS_DLQACKWAIT
+              value: {{ .Values.config.nats.dlqAckWait | quote }}
+            - name: NATS_DLQMAXACKPENDING
+              value: {{ .Values.config.nats.dlqMaxAckPending | quote }}
+            # -- Worker Pool (Onboarding) Settings --
+            - name: WORKERPOOLS_ONBOARDING_POOLSIZE
+              value: {{ .Values.config.workerPools.onboarding.poolSize | quote }}
+            - name: WORKERPOOLS_ONBOARDING_QUEUESIZE
+              value: {{ .Values.config.workerPools.onboarding.queueSize | quote }}
+            - name: WORKERPOOLS_ONBOARDING_MAXBLOCK
+              value: {{ .Values.config.workerPools.onboarding.maxBlock | quote }}
+            - name: WORKERPOOLS_ONBOARDING_EXPIRYTIME
+              value: {{ .Values.config.workerPools.onboarding.expiryTime | quote }}
+            # -- Secrets --
+            - name: POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secret.name | default (printf "%s-secret" .Release.Name) }}
+                  key: {{ .Values.secret.postgresDsnKey }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.config.serverPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready # Use /ready for readiness check
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }} 

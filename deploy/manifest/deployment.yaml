@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: daisi-wa-events-processor
+  namespace: default # Adjust if using a different namespace
+  labels:
+    app: daisi-wa-events-processor
+spec:
+  replicas: 1 # Start with 2 replicas, adjust as needed
+  selector:
+    matchLabels:
+      app: daisi-wa-events-processor
+  template:
+    metadata:
+      labels:
+        app: daisi-wa-events-processor
+    spec:
+      serviceAccountName: cicd-new
+      imagePullSecrets:
+        - name: gitlab-registry-auth-new
+      containers:
+        - name: daisi-wa-events-processor
+          # Replace with your actual image registry and tag
+          image: your-registry/daisi-wa-events-processor:latest
+          imagePullPolicy: IfNotPresent # Or Always if using :latest frequently
+          ports:
+            - name: http
+              containerPort: 8080 # Matches SERVER_PORT default
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: daisi-wa-events-processor-config # Load non-sensitive config
+            - secretRef:
+                name: daisi-wa-events-processor-secret # Load sensitive config (POSTGRES_DSN)
+          # Liveness probe checks if the container needs restarting
+          livenessProbe:
+            httpGet:
+              path: /health # From main.go healthcheck server
+              port: http # Refers to the 'http' port name above
+            initialDelaySeconds: 15 # Wait before first probe
+            periodSeconds: 20 # Probe frequency
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Readiness probe checks if the container is ready to serve traffic
+          readinessProbe:
+            httpGet:
+              path: /ready # From main.go healthcheck server
+              port: http # Refers to the 'http' port name above
+            initialDelaySeconds: 5 # Wait before first probe
+            periodSeconds: 10 # Probe frequency
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Optional: Define resource requests and limits
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m" # 0.1 vCPU
+            limits:
+              memory: "256Mi"
+              cpu: "200m" # 0.5 vCPU
+      # Optional: Specify service account, image pull secrets, etc.

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UpdateChatPayload",
+  "description": "Schema for NATS payload to update chat data.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "description": "The internal unique identifier of the chat record to update.",
+      "type": "string"
+    },
+    "company_id": {
+      "description": "Identifier for the company tenant.",
+      "type": "string"
+    },
+    "unread_count": {
+      "description": "Updated number of unread messages.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "conversation_timestamp": {
+      "description": "Updated Unix timestamp (second) of the last conversation activity.",
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "id",
+    "company_id"
+  ]
+} 

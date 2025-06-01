@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: daisi-wa-events-processor-config
+  namespace: default # Adjust if using a different namespace
+data:
+  # Base Config
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "info"
+  COMPANY_ID: "TKDO"
+  SERVER_PORT: "8080"
+  METRICS_ENABLED: "true"
+  DATABASE_POSTGRESAUTOMIGRATE: "true"
+
+  # NATS Base URL (Moved from Secret for consistency with Helm)
+  NATS_URL: "nats://admin:admin@206.189.42.118:30315"
+
+  # NATS Realtime Consumer Config
+  NATS_REALTIME_MAXDELIVER: "5"
+  NATS_REALTIME_NAKBASEDELAY: "1s"
+  NATS_REALTIME_NAKMAXDELAY: "30s"
+
+  # NATS Historical Consumer Config
+  NATS_HISTORICAL_MAXDELIVER: "3"
+  NATS_HISTORICAL_NAKBASEDELAY: "2s"
+  NATS_HISTORICAL_NAKMAXDELAY: "60s"
+
+  # NATS DLQ Config
+  NATS_DLQSTREAM: "dlq_stream"
+  NATS_DLQSUBJECT: "v1.dlq"
+  NATS_DLQWORKERS: "8"
+  NATS_DLQBASEDELAYMINUTES: "5"
+  NATS_DLQMAXDELAYMINUTES: "5"
+  NATS_DLQMAXAGEDAYS: "7"
+  NATS_DLQMAXDELIVER: "10"
+  NATS_DLQACKWAIT: "30s"
+  NATS_DLQMAXACKPENDING: "1000"
+
+  # Worker Pool (Onboarding) Config
+  WORKERPOOLS_ONBOARDING_POOLSIZE: "10"
+  WORKERPOOLS_ONBOARDING_QUEUESIZE: "10000"
+  WORKERPOOLS_ONBOARDING_MAXBLOCK: "1s"
+  WORKERPOOLS_ONBOARDING_EXPIRYTIME: "1m"

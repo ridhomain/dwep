@@ -1,0 +1,182 @@
+# deploy/helm/values.yaml
+
+# Default values for daisi-wa-events-processor chart.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  # -- Image repository for the daisi-wa-events-processor
+  repository: daisi-wa-events-processor # Replace with your image repository if needed
+  pullPolicy: IfNotPresent
+  # -- Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Specifies whether a service account should be created
+  create: true
+  # -- Automatically mount a ServiceAccount token
+  automount: true
+  # -- Annotations to add to the service account
+  annotations: {}
+  # -- The name of the service account to use. If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  # -- The port the service will expose internally
+  port: 8080 # Matches server.port default
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources:
+  # -- Resource limits and requests for the pod.
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  limits:
+  #   cpu: 500m # Based on load test config
+  #   memory: 512Mi # Based on load test config
+  requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+# Node selection constraints
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Application specific configurations
+# Values here will be passed as environment variables, often prefixed with 
+# and with '.' replaced by '_' (e.g., nats.url becomes NATS_URL)
+# Check internal/config/config.go and internal/config/default.yaml for details
+config:
+  # -- Company ID for this instance. MUST be overridden for each tenant deployment.
+  companyId: "CompanyHelm01"
+  # -- Logging level (debug, info, warn, error)
+  logLevel: "info"
+  # -- Application server port (must match service.port)
+  serverPort: 8080
+  # -- Enable/disable Prometheus metrics endpoint (served on serverPort/metrics)
+  metricsEnabled: true
+  # -- Enable/disable automatic database migrations on startup
+  databaseAutoMigrate: true
+
+  nats:
+    # -- NATS server URL(s). Use comma-separated for multiple servers.
+    url: "nats://nats:4222" # Default assumes NATS service named 'nats' in the same namespace
+
+    # -- Realtime Consumer Settings --
+    realtime:
+      # -- Max delivery attempts by NATS before sending to DLQ
+      maxDeliver: 5
+      # -- Base delay for NAK (retry) backoff
+      nakBaseDelay: "1s"
+      # -- Maximum delay for NAK (retry) backoff
+      nakMaxDelay: "30s"
+
+    # -- Historical Consumer Settings --
+    historical:
+      # -- Max delivery attempts by NATS before sending to DLQ
+      maxDeliver: 3
+      # -- Base delay for NAK (retry) backoff
+      nakBaseDelay: "2s"
+      # -- Maximum delay for NAK (retry) backoff
+      nakMaxDelay: "60s"
+
+    # -- DLQ Settings --
+    dlqStream: "dlq_stream"
+    dlqSubject: "v1.dlq" # Will be appended with .<companyId> by the service
+    dlqWorkers: 8
+    dlqBaseDelayMinutes: 5
+    dlqMaxDelayMinutes: 5
+    dlqMaxAgeDays: 7
+    dlqMaxDeliver: 10 # Max redelivery attempts for the DLQ *consumer*
+    dlqAckWait: "30s" # Ack wait for the DLQ *consumer*
+    dlqMaxAckPending: 1000 # Max pending ACKs for the DLQ *consumer*
+
+  # -- Worker Pool (Onboarding) Settings --
+  workerPools:
+    onboarding:
+      poolSize: 10
+      queueSize: 10000
+      maxBlock: "1s"
+      expiryTime: "1m"
+
+# Secret management
+# Assumes a secret exists or will be created containing the keys below
+secret:
+  # -- Name of the Kubernetes secret containing sensitive configuration. If empty, defaults to '{{ .Release.Name }}-secret'.
+  name: ""
+  # -- Key within the secret that holds the PostgreSQL DSN. The application expects this DSN under the POSTGRES_DSN env var.
+  postgresDsnKey: "POSTGRES_DSN"
+
+# -- Service Monitor configuration for Prometheus Operator
+serviceMonitor:
+  enabled: false
+  # namespace: monitoring # Specify if Prometheus Operator is in a different namespace
+  interval: 15s
+  scrapeTimeout: 10s
+  labels: {}
+  # Additional labels for the ServiceMonitor
+  # prometheus: kube-prometheus
+
+# Note: External dependencies like PostgreSQL and NATS are NOT managed by default.
+# You need to ensure they are available in the cluster or enable subcharts (not included here).
+# See commented out examples below for potential subchart integration if needed later.
+
+# postgres:
+#   enabled: false
+#   auth:
+#     existingSecret: "my-postgres-secret" # Example
+
+# nats:
+#   enabled: false
+#   nats:
+#     jetstream:
+#       enabled: true
+#     cluster:
+#       enabled: false

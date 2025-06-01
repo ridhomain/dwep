@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: daisi-wa-events-processor
+  namespace: default # Adjust if using a different namespace
+  labels:
+    app: daisi-wa-events-processor
+spec:
+  type: ClusterIP # Exposes the service on a cluster-internal IP
+  selector:
+    app: daisi-wa-events-processor # Must match labels in Deployment template
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8080 # Service port, matches the default container port
+      targetPort: http # Target container port name (8080)
+    - name: metrics
+      protocol: TCP
+      port: 2112 # Service port for metrics
+      targetPort: metrics # Target container port name (2112)

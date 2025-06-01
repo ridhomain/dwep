@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UpdateMessagePayload",
+  "description": "Schema for NATS payload to update message status.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "description": "The unique identifier (message_id) of the message to update.",
+      "type": "string"
+    },
+    "company_id": {
+      "description": "Identifier for the company tenant.",
+      "type": "string"
+    },
+    "status": {
+      "description": "The new delivery status for the message.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "company_id",
+    "status"
+  ]
+} 

@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HistoryContactPayload",
+  "description": "Schema for NATS payload containing a batch of contact history data.",
+  "type": "object",
+  "definitions": {
+    "UpsertContactPayload": {
+      "title": "UpsertContactPayload",
+      "description": "Schema for NATS payload to upsert contact data.",
+      "type": "object",
+      "properties": {
+        "phone_number": {
+          "description": "Normalized phone number of the contact.",
+          "type": "string"
+        },
+        "company_id": {
+          "description": "Identifier for the company tenant this contact belongs to.",
+          "type": "string"
+        },
+        "push_name": {
+          "description": "Push name obtained from WhatsApp metadata.",
+          "type": "string"
+        },
+        "agent_id": {
+          "description": "Identifier of the agent primarily responsible for this contact.",
+          "type": "string"
+        }
+      },      
+      "required": [
+        "phone_number",
+        "company_id",
+        "agent_id",
+        "push_name"
+      ]
+    }
+  },
+  "properties": {
+    "contacts": {
+      "description": "An array of contact upsert payloads.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/UpsertContactPayload"
+      }
+    }
+  },
+  "required": [
+    "contacts"
+  ]
+} 

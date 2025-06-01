@@ -1,0 +1,44 @@
+image: docker:latest
+services:
+  - docker:dind
+
+stages:
+  - build
+
+variables:
+  CI_REGISTRY: registry.gitlab.com
+  DOCKER_USER: ridhomain
+  TOKEN_ACCESS: ""
+  REGISTRY_NAME: ridhomain/message-event-service
+  TAG_COMMIT: ${CI_REGISTRY}/${REGISTRY_NAME}:${CI_COMMIT_TAG}
+  TAG_COMMIT_LATEST: ${CI_REGISTRY}/${REGISTRY_NAME}:latest
+  SERVER: https://42b4a7fb-602d-4993-8a58-55aae11a85d1.k8s.ondigitalocean.com
+
+build:
+  stage: build
+  only:
+    - tags
+  script:
+    - docker login ${CI_REGISTRY} -u ${DOCKER_USER} -p ${TOKEN_ACCESS}
+    - docker build -t ${TAG_COMMIT} .
+    - docker image tag ${TAG_COMMIT} ${TAG_COMMIT_LATEST}
+    - docker push ${TAG_COMMIT}
+    - docker push ${TAG_COMMIT_LATEST}
+
+set_protected_tag:
+  stage: build
+  only:
+    - tags
+  image: curlimages/curl
+  script:
+    - echo "Setting protected tag for ${CI_COMMIT_TAG}"
+    - |
+      curl --silent --request POST --header "PRIVATE-TOKEN: ${TOKEN_ACCESS}" \
+      --header "Content-Type: application/json" \
+      --data '{
+          "name": "'"${CI_COMMIT_TAG}"'",
+          "create_access_levels": [
+              { "access_level": 40 } 
+          ]
+      }' \
+      https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/protected_tags

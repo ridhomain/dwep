@@ -1,0 +1,53 @@
+services:
+  nats:
+    image: nats:2.11-alpine
+    command: "--name local-nats-server --http_port 8222 --jetstream --store_dir /data"
+    ports:
+      - "4222:4222"
+      - "6222:6222"
+      - "8222:8222"
+    volumes:
+      - ./.data/nats:/data
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "http://localhost:8222/healthz" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: message_service
+    ports:
+      - "54321:5432"
+    volumes:
+      - ./.data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  message-service:
+    image: daisi-wa-events-processor:latest
+    environment:
+      POSTGRES_DSN: postgres://postgres:postgres@postgres:5432/message_service
+      NATS_URL: nats://nats:4222
+      COMPANY_ID: company_dev
+      LOG_LEVEL: debug
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      nats:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy

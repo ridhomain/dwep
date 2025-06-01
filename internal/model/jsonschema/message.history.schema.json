@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HistoryMessagePayload",
+  "description": "Schema for NATS payload containing a batch of message history data.",
+  "type": "object",
+  "definitions": {
+    "KeyPayload": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The unique identifier of the message key.",
+          "type": "string"
+        },
+        "from_me": {
+          "description": "Indicates if the message was sent from the user's account.",
+          "type": "boolean"
+        },
+        "remote_jid": {
+          "description": "The JID of the other participant in the chat.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "UpsertMessagePayload": {
+      "title": "UpsertMessagePayload",
+      "description": "Schema for NATS payload to upsert message data.",
+      "type": "object",
+      "properties": {
+        "message_id": {
+          "description": "Unique identifier for the message.",
+          "type": "string"
+        },
+        "to": {
+          "description": "Recipient identifier.",
+          "type": "string"
+        },
+        "from": {
+          "description": "Sender identifier.",
+          "type": "string"
+        },
+        "chat_id": {
+          "description": "Identifier of the chat this message belongs to.",
+          "type": "string"
+        },
+        "jid": {
+          "description": "JID associated with the message context.",
+          "type": "string"
+        },
+        "flow": {
+          "description": "Indicates the direction of the message (IN or OUT).",
+          "type": "string",
+          "enum": ["IN", "OUT"]
+        },
+        "company_id": {
+          "description": "Identifier for the company tenant.",
+          "type": "string"
+        },
+        "agent_id": {
+          "description": "Identifier for the Daisi agent involved.",
+          "type": "string"
+        },
+        "key": {
+          "description": "Object containing message key details.",
+          "$ref": "#/definitions/KeyPayload"
+        },
+        "message_obj": {
+          "description": "Full structured message content.",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "status": {
+          "description": "Delivery status of the message.",
+          "type": "string"
+        },
+        "message_timestamp": {
+          "description": "Unix timestamp (seconds) when the message was sent/received.",
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "message_id",
+        "chat_id",
+        "jid",
+        "flow",
+        "company_id",
+        "status"
+      ]
+    }
+  },
+  "properties": {
+    "messages": {
+      "description": "An array of message upsert payloads.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/UpsertMessagePayload"
+      }
+    }
+  },
+  "required": [
+    "messages"
+  ]
+} 

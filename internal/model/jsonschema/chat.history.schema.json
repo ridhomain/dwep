@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HistoryChatPayload",
+  "description": "Schema for NATS payload containing a batch of chat history data.",
+  "type": "object",
+  "definitions": {
+    "UpsertChatPayload": {
+      "title": "UpsertChatPayload",
+      "description": "Schema for NATS payload to upsert chat data.",
+      "type": "object",
+      "properties": {
+        "chat_id": {
+          "description": "Unique chat identifier.",
+          "type": "string"
+        },
+        "jid": {
+          "description": "JID (Jabber ID) associated with the chat.",
+          "type": "string"
+        },
+        "company_id": {
+          "description": "Identifier for the company tenant.",
+          "type": "string"
+        },
+        "agent_id": {
+          "description": "Identifier for the Daisi agent.",
+          "type": "string"
+        },
+        "phone_number": {
+          "description": "Phone number associated with the chat.",
+          "type": "string"
+        },
+        "push_name": {
+          "description": "Push name provided by the client.",
+          "type": "string"
+        },
+        "custom_name": {
+          "description": "Custom alias or name for the chat.",
+          "type": "string"
+        },
+        "is_group": {
+          "description": "Flag indicating if the chat is a group chat.",
+          "type": "boolean"
+        },
+        "group_name": {
+          "description": "Name of the group if is_group is true.",
+          "type": "string"
+        },
+        "assigned_to": {
+          "description": "Identifier of the agent assigned to handle the chat.",
+          "type": "string"
+        },
+        "last_message": {
+          "description": "Object containing the last message details.",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "conversation_timestamp": {
+          "description": "Unix timestamp (second) of the last conversation activity.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "unread_count": {
+          "description": "Number of unread messages in the chat.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "not_spam": {
+          "description": "Flag indicating if the chat is marked as not spam.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "chat_id",
+        "jid",
+        "company_id",
+        "phone_number"
+      ]
+    }
+  },
+  "properties": {
+    "chats": {
+      "description": "An array of chat upsert payloads.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/UpsertChatPayload"
+      }
+    }
+  },
+  "required": [
+    "chats"
+  ]
+} 

@@ -1,0 +1,22 @@
+{{/* deploy/helm/templates/NOTES.txt */}}
+{{- $fullName := include "daisi-wa-events-processor.fullname" . -}}
+{{- $servicePort := .Values.service.httpPort -}}
+{{- $metricsPort := .Values.service.metricsPort -}}
+
+The daisi-wa-events-processor chart has been deployed.
+
+Service Name: {{ $fullName }}
+Namespace: {{ .Release.Namespace }}
+
+To access the service within the cluster:
+  ClusterIP: {{ .Values.service.type }}
+  HTTP Port: {{ $servicePort }} (Target Port: {{ .Values.config.defaultYaml | fromYaml | get "server" "port" | default 8080 }})
+  Metrics Port: {{ $metricsPort }} (Target Port: {{ .Values.config.defaultYaml | fromYaml | get "metrics" "port" | default 2112 }})
+
+You can access the service using port-forwarding (replace <pod-name> with an actual pod name):
+  kubectl port-forward pod/{{ $fullName }}-<pod-name> {{ $servicePort }}:{{ .Values.config.defaultYaml | fromYaml | get "server" "port" | default 8080 }} -n {{ .Release.Namespace }}
+
+For metrics:
+  kubectl port-forward pod/{{ $fullName }}-<pod-name> {{ $metricsPort }}:{{ .Values.config.defaultYaml | fromYaml | get "metrics" "port" | default 2112 }} -n {{ .Release.Namespace }}
+
+Remember to update the image repository in values.yaml and provide actual secrets via --set or a separate values file for production deployments.

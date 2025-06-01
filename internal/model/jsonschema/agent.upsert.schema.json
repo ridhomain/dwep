@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UpsertAgentPayload",
+  "description": "Schema for NATS payload to upsert agent data.",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "description": "Unique identifier for the agent.",
+      "type": "string"
+    },
+    "company_id": {
+      "description": "Identifier for the company tenant this agent belongs to.",
+      "type": "string"
+    },
+    "qr_code": {
+      "description": "QR code string for linking or pairing the agent.",
+      "type": "string"
+    },
+    "status": {
+      "description": "Current connection status of the agent.",
+      "type": "string"
+    },
+    "agent_name": {
+      "description": "Custom label or name for the agent.",
+      "type": "string"
+    },
+    "host_name": {
+      "description": "Hostname of the device or server running the agent.",
+      "type": "string"
+    },
+    "version": {
+      "description": "Version information of the agent software.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "agent_id",
+    "company_id"
+  ]
+} 

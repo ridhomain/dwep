@@ -1,0 +1,73 @@
+# Default configuration for Daisi WA Events Processor
+
+# General settings
+environment: development
+logLevel: info
+
+# Server configuration
+server:
+  port: 8080
+
+# NATS JetStream configuration
+nats:
+  url: nats://
+  realtime:
+    maxAge: 30
+    stream: wa_events_stream
+    consumer: wa_listener_
+    group: wa_event_group_
+    subjectList:
+      - v1.connection.update
+      - v1.chats.update
+      - v1.chats.upsert
+      - v1.messages.update
+      - v1.messages.upsert
+      - v1.contacts.update
+      - v1.contacts.upsert
+    maxDeliver: 5 # Default MaxDeliver for realtime
+    nakBaseDelay: 1s # base delay for retry NAK
+    nakMaxDelay: 30s # max delay for retry NAK
+  historical:
+    maxAge: 30
+    stream: wa_history_events_stream
+    consumer: wa_history_listener_
+    group: wa_history_event_group_
+    subjectList:
+      - v1.history.chats
+      - v1.history.messages
+      - v1.history.contacts
+    maxDeliver: 3 # Default MaxDeliver for historical
+    nakBaseDelay: 2s # base delay for retry NAK
+    nakMaxDelay: 60s # max delay for retry NAK
+  dlqStream: dlq_stream       # Default DLQ stream name
+  dlqSubject: v1.dlq          # Default base subject for DLQ (will be appended with .<company>)
+  dlqWorkers: 8             # Number of workers for DLQ processing
+  dlqBaseDelayMinutes: 5          # Base delay in minutes for exponential backoff
+  dlqMaxDelayMinutes: 5          # Max delay in minutes for exponential backoff
+  dlqMaxAgeDays: 7       # Default 7 days retention
+  dlqMaxDeliver: 10      # Default 10 redelivery attempts
+  dlqAckWait: 30s        # Default 30 second ACK wait
+  dlqMaxAckPending: 1000 # Default 1000 max pending ACKs
+
+# Database configuration
+database:
+  postgresDSN: 
+  postgresAutoMigrate: true
+
+# Company configuration
+company:
+  default: default_tenant
+  id: "RIDH"  # Will be overridden by env var COMPANY_ID
+
+# Metrics configuration
+metrics:
+  enabled: true
+  port: 2112
+
+# Worker Pool Configurations
+workerPools:
+  onboarding:
+    poolSize: 10       # Number of concurrent workers processing onboarding logs
+    queueSize: 10000   # Buffer size for pending onboarding tasks
+    maxBlock: 1s     # Max time to wait if queue is full before returning error
+    expiryTime: 1m   # How long an idle worker waits before shutting down 

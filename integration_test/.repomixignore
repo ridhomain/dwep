@@ -1,0 +1,27 @@
+# Add patterns to ignore here, one per line
+# Example:
+# *.log
+# tmp/
+
+*.sum
+*.out
+projects/
+docs/
+deploy/
+.idea/
+.data/
+.cursor/
+sql/
+*.sql
+proto/
+repomix-output.*
+README.md
+docker*
+Dockerfile
+Makefile
+*ignore
+scripts/
+tasks/
+.windsurfrules
+*.md
+*.payload.json
