@@ -24,9 +24,9 @@ type Message struct {
 	Type             string         `json:"type,omitempty" gorm:"column:type"`
 	AgentID          string         `json:"agent_id,omitempty" gorm:"column:agent_id;index"`
 	CompanyID        string         `json:"company_id,omitempty" gorm:"column:company_id"` // CompanyID is implicitly the tenant ID
-	MessageObj       interface{}    `json:"message_obj,omitempty" gorm:"type:jsonb;column:message_obj"`
-	EditedMessageObj interface{}    `json:"edited_message_obj,omitempty" gorm:"type:jsonb;column:edited_message_obj"`
-	Key              interface{}    `json:"key,omitempty" gorm:"type:jsonb;column:key"`
+	MessageObj       datatypes.JSON `json:"message_obj,omitempty" gorm:"type:jsonb;column:message_obj"`
+	EditedMessageObj datatypes.JSON `json:"edited_message_obj,omitempty" gorm:"type:jsonb;column:edited_message_obj"`
+	Key              datatypes.JSON `json:"key,omitempty" gorm:"type:jsonb;column:key"`
 	Status           string         `json:"status,omitempty" gorm:"column:status"`
 	IsDeleted        bool           `json:"is_deleted,omitempty" gorm:"column:is_deleted;default:false"`
 	MessageTimestamp int64          `json:"message_timestamp,omitempty" gorm:"column:message_timestamp;index"`

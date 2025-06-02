@@ -171,7 +171,7 @@ func (s *EventService) ProcessHistoricalMessages(ctx context.Context, messages [
 
 		// Convert MessageObj to datatypes.JSON
 		if msg.MessageObj != nil {
-			dbMessage.MessageObj = msg.MessageObj
+			dbMessage.MessageObj = utils.MustMarshalJSON(msg.MessageObj)
 		}
 
 		// Transform Key if present
@@ -190,7 +190,7 @@ func (s *EventService) ProcessHistoricalMessages(ctx context.Context, messages [
 				"fromMe":    msg.Key.FromMe,
 				"remoteJid": msg.Key.RemoteJid,
 			}
-			dbMessage.Key = keyMap
+			dbMessage.Key = utils.MustMarshalJSON(keyMap)
 		}
 
 		// Set EventTimestamp from MessageTimestamp if available
@@ -305,7 +305,7 @@ func (s *EventService) UpsertMessage(ctx context.Context, payload model.UpsertMe
 
 	// Convert MessageObj to datatypes.JSON
 	if payload.MessageObj != nil {
-		message.MessageObj = payload.MessageObj
+		message.MessageObj = utils.MustMarshalJSON(payload.MessageObj)
 	}
 
 	// Transform Key if present
@@ -324,7 +324,7 @@ func (s *EventService) UpsertMessage(ctx context.Context, payload model.UpsertMe
 			"fromMe":    payload.Key.FromMe,
 			"remoteJid": payload.Key.RemoteJid,
 		}
-		message.Key = keyMap
+		message.Key = utils.MustMarshalJSON(keyMap)
 	}
 
 	// Set EventTimestamp from MessageTimestamp if available
@@ -452,7 +452,7 @@ func (s *EventService) UpdateMessage(ctx context.Context, payload model.UpdateMe
 	}
 
 	if payload.EditedMessageObj != nil {
-		message.EditedMessageObj = payload.EditedMessageObj
+		message.EditedMessageObj = utils.MustMarshalJSON(payload.EditedMessageObj)
 	}
 
 	if payload.IsDeleted != message.IsDeleted {

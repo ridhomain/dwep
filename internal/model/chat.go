@@ -16,7 +16,7 @@ type Chat struct {
 	IsGroup               bool           `json:"is_group,omitempty" gorm:"column:is_group"`
 	GroupName             string         `json:"group_name,omitempty" gorm:"column:group_name"`
 	UnreadCount           int32          `json:"unread_count,omitempty" gorm:"column:unread_count"`
-	LastMessageObj        interface{}    `json:"last_message,omitempty" gorm:"type:jsonb;column:last_message"`
+	LastMessageObj        datatypes.JSON `json:"last_message,omitempty" gorm:"type:jsonb;column:last_message"`
 	ConversationTimestamp int64          `json:"conversation_timestamp,omitempty" gorm:"column:conversation_timestamp"`
 	NotSpam               bool           `json:"not_spam,omitempty" gorm:"column:not_spam"`
 	AgentID               string         `json:"agent_id,omitempty" gorm:"column:agent_id;index"`

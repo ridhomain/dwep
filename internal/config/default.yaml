@@ -10,7 +10,7 @@ server:
 
 # NATS JetStream configuration
 nats:
-  url: nats://
+  url: nats://admin:admin@nats
   realtime:
     maxAge: 30
     stream: wa_events_stream
@@ -51,7 +51,7 @@ nats:
 
 # Database configuration
 database:
-  postgresDSN: 
+  postgresDSN: ""
   postgresAutoMigrate: true
 
 # Company configuration
