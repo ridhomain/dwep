@@ -53,7 +53,7 @@ func createTestOnboardingTaskData(ctx context.Context, companyID, messageID, fro
 		Ctx: ctx,
 		Message: model.Message{
 			MessageID:        messageID,
-			FromUser:         from,
+			FromPhone:        from,
 			CompanyID:        companyID,
 			AgentID:          agentID, // Included agent ID
 			Flow:             "IN",    // Default to IN flow for most tests

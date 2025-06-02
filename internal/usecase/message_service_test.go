@@ -290,7 +290,7 @@ func TestProcessHistoricalMessagesWithMetadata(t *testing.T) {
 		ChatID:    "chat-1",
 		Flow:      "IN",
 		Status:    "pending",
-		FromUser:  "12345",
+		FromPhone: "12345",
 	}
 
 	metadata := &model.LastMetadata{
@@ -342,7 +342,7 @@ func TestProcessHistoricalMessagesWithKey(t *testing.T) {
 		ChatID:    "chat-1",
 		Flow:      "IN",
 		Status:    "pending",
-		FromUser:  "12345",
+		FromPhone: "12345",
 		Key: &model.KeyPayload{
 			ID:        "key-1",
 			FromMe:    true,
@@ -945,7 +945,7 @@ func TestUpsertMessageWithMetadata(t *testing.T) {
 		ChatID:    "chat-1",
 		Flow:      "IN",
 		Status:    "pending",
-		FromUser:  "12345",
+		FromPhone: "12345",
 	}
 
 	metadata := &model.LastMetadata{
@@ -993,7 +993,7 @@ func TestUpsertMessageWithKey(t *testing.T) {
 		ChatID:    "chat-1",
 		Flow:      "IN",
 		Status:    "pending",
-		FromUser:  "12345",
+		FromPhone: "12345",
 		Key: &model.KeyPayload{
 			ID:        "key-1",
 			FromMe:    true,
@@ -1151,7 +1151,7 @@ func TestUpsertMessageCreatesOnboardingLog(t *testing.T) {
 		CompanyID:        companyID,
 		ChatID:           "chat-onboard-1",
 		Status:           "received",
-		FromUser:         "+1 (234) 567-890",
+		FromPhone:        "+1 (234) 567-890",
 		Flow:             "IN",
 		MessageTimestamp: time.Now().Unix(),
 	}
@@ -1196,7 +1196,7 @@ func TestUpsertMessageSkipsOnboardingLogForExistingContact(t *testing.T) {
 		CompanyID:        companyID,
 		ChatID:           "chat-onboard-2",
 		Status:           "read",
-		FromUser:         "9876543210", // Keep the number in the payload
+		FromPhone:        "9876543210", // Keep the number in the payload
 		Flow:             "IN",
 		MessageTimestamp: time.Now().Unix(),
 	}
@@ -1239,7 +1239,7 @@ func TestUpsertMessageSkipsOnboardingLogForExistingLog(t *testing.T) {
 		CompanyID:        companyID,
 		ChatID:           "chat-onboard-3",
 		Status:           "delivered",
-		FromUser:         "1122334455",
+		FromPhone:        "1122334455",
 		Flow:             "IN",
 		MessageTimestamp: time.Now().Unix(),
 	}
@@ -1279,8 +1279,8 @@ func TestUpsertMessageSkipsOnboardingLogForOutgoingMessage(t *testing.T) {
 		CompanyID:        companyID,
 		ChatID:           "chat-onboard-4",
 		Status:           "sent",
-		FromUser:         "agent-sender",
-		ToUser:           "1234567890",
+		FromPhone:        "agent-sender",
+		ToPhone:          "1234567890",
 		Flow:             "OUT",
 		MessageTimestamp: time.Now().Unix(),
 	}
@@ -1318,7 +1318,7 @@ func TestUpsertMessageHandlesLogRepoFindError(t *testing.T) {
 		CompanyID: companyID,
 		ChatID:    "chat-1",
 		Flow:      "IN",
-		FromUser:  phoneNumber,
+		FromPhone: phoneNumber,
 		Status:    "pending",
 	}
 
@@ -1370,7 +1370,7 @@ func TestUpsertMessageHandlesLogRepoSaveError(t *testing.T) {
 		CompanyID: companyID,
 		ChatID:    "chat-1",
 		Flow:      "IN",
-		FromUser:  phoneNumber,
+		FromPhone: phoneNumber,
 		Status:    "pending",
 	}
 

@@ -100,8 +100,8 @@ func NewKeyPayload(overrideDefaults ...*KeyPayload) *KeyPayload {
 func NewUpsertMessagePayload(overrideDefaults ...*UpsertMessagePayload) *UpsertMessagePayload {
 	base := &UpsertMessagePayload{
 		MessageID:        gofakeit.UUID(),
-		ToUser:           gofakeit.Phone(),
-		FromUser:         gofakeit.Phone(),
+		ToPhone:          gofakeit.Phone(),
+		FromPhone:        gofakeit.Phone(),
 		ChatID:           gofakeit.UUID(),
 		Jid:              gofakeit.UUID() + "@" + gofakeit.RandomString([]string{"s.whatsapp.net", "g.us"}),
 		Flow:             gofakeit.RandomString([]string{MessageFlowIncoming, MessageFlowOutgoing}),
@@ -118,11 +118,11 @@ func NewUpsertMessagePayload(overrideDefaults ...*UpsertMessagePayload) *UpsertM
 		if ovr.MessageID != "" {
 			base.MessageID = ovr.MessageID
 		}
-		if ovr.ToUser != "" {
-			base.ToUser = ovr.ToUser
+		if ovr.ToPhone != "" {
+			base.ToPhone = ovr.ToPhone
 		}
-		if ovr.FromUser != "" {
-			base.FromUser = ovr.FromUser
+		if ovr.FromPhone != "" {
+			base.FromPhone = ovr.FromPhone
 		}
 		if ovr.ChatID != "" {
 			base.ChatID = ovr.ChatID

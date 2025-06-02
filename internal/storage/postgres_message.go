@@ -335,8 +335,8 @@ func (r *PostgresRepo) FindMessagesBySender(ctx context.Context, sender string, 
 	return messages, nil
 }
 
-// FindMessagesByFromUser finds messages by the 'from' field (user identifier) within a date range
-func (r *PostgresRepo) FindMessagesByFromUser(ctx context.Context, fromUser string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error) {
+// FindMessagesByFromPhone finds messages by the 'from' field (user identifier) within a date range
+func (r *PostgresRepo) FindMessagesByFromPhone(ctx context.Context, FromPhone string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error) {
 	companyID, err := tenant.FromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed to get tenant ID: %w", apperrors.ErrUnauthorized, err)
@@ -346,7 +346,7 @@ func (r *PostgresRepo) FindMessagesByFromUser(ctx context.Context, fromUser stri
 	var messages []model.Message
 	operation := func() error {
 		query := r.db.WithContext(ctx).
-			Where(`"from" = ? AND company_id = ? AND message_date >= ? AND message_date <= ?`, fromUser, companyID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+			Where(`"from" = ? AND company_id = ? AND message_date >= ? AND message_date <= ?`, FromPhone, companyID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 			Order("message_timestamp DESC").
 			Limit(limit).
 			Offset(offset).
@@ -359,12 +359,12 @@ func (r *PostgresRepo) FindMessagesByFromUser(ctx context.Context, fromUser stri
 
 	readPolicy := newRetryPolicy(ctx, readRetryMaxElapsedTime)
 	startTime := utils.Now()
-	err = retryableOperation(ctx, readPolicy, "FindMessagesByFromUser", operation)
-	observer.ObserveDbOperationDuration("find_by_from_user", "message", companyID, time.Since(startTime), err)
+	err = retryableOperation(ctx, readPolicy, "FindMessagesByFromPhone", operation)
+	observer.ObserveDbOperationDuration("find_by_from_phone", "message", companyID, time.Since(startTime), err)
 
 	if err != nil {
 		loggerCtx.Error("Failed to find messages by from user after retries",
-			zap.String("from_user", fromUser),
+			zap.String("from_phone", FromPhone),
 			zap.Time("startDate", startDate),
 			zap.Time("endDate", endDate),
 			zap.String("company_id", companyID),
@@ -374,8 +374,8 @@ func (r *PostgresRepo) FindMessagesByFromUser(ctx context.Context, fromUser stri
 	return messages, nil
 }
 
-// FindMessagesByToUser finds messages by the 'to' field (recipient identifier) within a date range
-func (r *PostgresRepo) FindMessagesByToUser(ctx context.Context, toUser string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error) {
+// FindMessagesByToPhone finds messages by the 'to' field (recipient identifier) within a date range
+func (r *PostgresRepo) FindMessagesByToPhone(ctx context.Context, ToPhone string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error) {
 	companyID, err := tenant.FromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed to get tenant ID: %w", apperrors.ErrUnauthorized, err)
@@ -385,7 +385,7 @@ func (r *PostgresRepo) FindMessagesByToUser(ctx context.Context, toUser string, 
 	var messages []model.Message
 	operation := func() error {
 		query := r.db.WithContext(ctx).
-			Where(`"to_user" = ? AND company_id = ? AND message_date >= ? AND message_date <= ?`, toUser, companyID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
+			Where(`"to_phone" = ? AND company_id = ? AND message_date >= ? AND message_date <= ?`, ToPhone, companyID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02")).
 			Order("message_timestamp DESC").
 			Limit(limit).
 			Offset(offset).
@@ -398,12 +398,12 @@ func (r *PostgresRepo) FindMessagesByToUser(ctx context.Context, toUser string, 
 
 	readPolicy := newRetryPolicy(ctx, readRetryMaxElapsedTime)
 	startTime := utils.Now()
-	err = retryableOperation(ctx, readPolicy, "FindMessagesByToUser", operation)
-	observer.ObserveDbOperationDuration("find_by_to_user", "message", companyID, time.Since(startTime), err)
+	err = retryableOperation(ctx, readPolicy, "FindMessagesByToPhone", operation)
+	observer.ObserveDbOperationDuration("find_by_to_phone", "message", companyID, time.Since(startTime), err)
 
 	if err != nil {
 		loggerCtx.Error("Failed to find messages by to user after retries",
-			zap.String("to_user", toUser),
+			zap.String("to_phone", ToPhone),
 			zap.Time("startDate", startDate),
 			zap.Time("endDate", endDate),
 			zap.String("company_id", companyID),

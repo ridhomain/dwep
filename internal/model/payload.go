@@ -39,12 +39,14 @@ type HistoryChatPayload struct {
 // --- Message NATS Payload --- //
 type UpsertMessagePayload struct {
 	MessageID        string                 `json:"message_id,omitempty" validate:"required"`
-	ToUser           string                 `json:"to_user,omitempty" validate:"omitempty"`
-	FromUser         string                 `json:"from_user,omitempty" validate:"omitempty"`
+	ToPhone          string                 `json:"to_phone,omitempty" validate:"omitempty"`
+	FromPhone        string                 `json:"from_phone,omitempty" validate:"omitempty"`
 	ChatID           string                 `json:"chat_id,omitempty" validate:"required"`
 	Jid              string                 `json:"jid,omitempty" validate:"required"`
 	Flow             string                 `json:"flow,omitempty" validate:"required,oneof=IN OUT"` // Flow indicates the direction of the message (IN or OUT)
-	Type             string                 `json:"type,omitempty" validate:"required"`
+	MessageType      string                 `json:"message_type,omitempty" validate:"required"`
+	MessageText      string                 `json:"message_text,omitempty" validate:"required"`
+	MessageUrl       string                 `json:"message_url,omitempty" validate:"required"`
 	CompanyID        string                 `json:"company_id,omitempty" validate:"required"`
 	AgentID          string                 `json:"agent_id,omitempty" validate:"required"`
 	Key              *KeyPayload            `json:"key,omitempty" validate:"omitempty"`
@@ -73,13 +75,14 @@ type UpdateMessagePayload struct {
 
 // --- Agent NATS Payload --- //
 type UpsertAgentPayload struct {
-	AgentID   string `json:"agent_id,omitempty" validate:"required"`
-	CompanyID string `json:"company_id,omitempty" validate:"required"`
-	QRCode    string `json:"qr_code,omitempty" validate:"omitempty"`
-	Status    string `json:"status,omitempty" validate:"omitempty"`
-	AgentName string `json:"agent_name,omitempty" validate:"omitempty"`
-	HostName  string `json:"host_name,omitempty" validate:"omitempty"`
-	Version   string `json:"version,omitempty" validate:"omitempty"`
+	AgentID     string `json:"agent_id,omitempty" validate:"required"`
+	CompanyID   string `json:"company_id,omitempty" validate:"required"`
+	QRCode      string `json:"qr_code,omitempty" validate:"omitempty"`
+	Status      string `json:"status,omitempty" validate:"omitempty"`
+	AgentName   string `json:"agent_name,omitempty" validate:"omitempty"`
+	HostName    string `json:"host_name,omitempty" validate:"omitempty"`
+	Version     string `json:"version,omitempty" validate:"omitempty"`
+	PhoneNumber string `json:"phone_number,omitempty" validate:"omitempty"`
 }
 
 // --- Contact NATS Payload --- //

@@ -321,8 +321,8 @@ func TestNewPostgresRepo(t *testing.T) {
 	CREATE TABLE messages (
 		id BIGSERIAL NOT NULL,
 		message_id TEXT,
-		from_user TEXT, -- Quoted because 'from' is a reserved keyword
-		to_user TEXT,   -- Quoted because 'to' is a reserved keyword
+		from_phone TEXT, -- Quoted because 'from' is a reserved keyword
+		to_phone TEXT,   -- Quoted because 'to' is a reserved keyword
 		chat_id TEXT,
 		jid TEXT,
 		company_id VARCHAR,
@@ -371,8 +371,8 @@ func TestNewPostgresRepo(t *testing.T) {
 
 	// Index patterns (use QuoteMeta for exact index DDL)
 	idxMessagesMessageIDPattern := regexp.QuoteMeta(`CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_message_id ON messages USING btree (message_id, message_date);`)
-	idxMessagesFromUserPattern := regexp.QuoteMeta(`CREATE INDEX IF NOT EXISTS idx_messages_from ON messages USING btree (from_user);`)
-	idxMessagesToUserPattern := regexp.QuoteMeta(`CREATE INDEX IF NOT EXISTS idx_messages_to ON messages USING btree (to_user);`)
+	idxMessagesFromPhonePattern := regexp.QuoteMeta(`CREATE INDEX IF NOT EXISTS idx_messages_from ON messages USING btree (from_phone);`)
+	idxMessagesToPhonePattern := regexp.QuoteMeta(`CREATE INDEX IF NOT EXISTS idx_messages_to ON messages USING btree (to_phone);`)
 	idxMessagesChatIDPattern := regexp.QuoteMeta(`CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages USING btree (chat_id);`)
 	idxMessagesJidPattern := regexp.QuoteMeta(`CREATE INDEX IF NOT EXISTS idx_messages_jid ON messages USING btree (jid);`)
 	idxMessagesAgentIDPattern := regexp.QuoteMeta(`CREATE INDEX IF NOT EXISTS idx_messages_agent_id ON messages USING btree (agent_id);`)
@@ -416,8 +416,8 @@ func TestNewPostgresRepo(t *testing.T) {
 
 		// 4. Create Messages Indexes
 		mock.ExpectExec(idxMessagesMessageIDPattern).WillReturnResult(sqlmock.NewResult(0, 0))
-		mock.ExpectExec(idxMessagesFromUserPattern).WillReturnResult(sqlmock.NewResult(0, 0))
-		mock.ExpectExec(idxMessagesToUserPattern).WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectExec(idxMessagesFromPhonePattern).WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectExec(idxMessagesToPhonePattern).WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectExec(idxMessagesChatIDPattern).WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectExec(idxMessagesJidPattern).WillReturnResult(sqlmock.NewResult(0, 0))
 		mock.ExpectExec(idxMessagesAgentIDPattern).WillReturnResult(sqlmock.NewResult(0, 0))

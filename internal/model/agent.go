@@ -19,6 +19,8 @@ type Agent struct {
 	Status string `json:"status,omitempty" gorm:"column:status"`
 	// AgentName is a user-defined custom label or name for the agent.
 	AgentName string `json:"agent_name,omitempty" gorm:"column:agent_name"`
+	// PhoneNumber is a number that registered for the agent.
+	PhoneNumber string `json:"phone_number,omitempty" gorm:"column:phone_number"`
 	// HostName is the name of the device or host machine running the agent instance.
 	HostName string `json:"host_name,omitempty" gorm:"column:host_name"`
 	// Version stores the version information of the agent software.
@@ -47,5 +49,6 @@ func AgentUpdateColumns() []string {
 		"host_name",
 		"version",
 		"updated_at",
+		"phone_number",
 	}
 }

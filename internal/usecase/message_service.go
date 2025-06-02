@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sourcegraph/conc/iter"
 	"go.uber.org/zap"
 	"gorm.io/datatypes"
 
@@ -157,10 +156,12 @@ func (s *EventService) ProcessHistoricalMessages(ctx context.Context, messages [
 		dbMessage := model.Message{
 			MessageID:        msg.MessageID,
 			Jid:              msg.Jid,
-			ToUser:           msg.ToUser,
-			FromUser:         msg.FromUser,
+			ToPhone:          msg.ToPhone,
+			FromPhone:        msg.FromPhone,
 			Flow:             msg.Flow,
-			Type:             msg.Type,
+			MessageType:      msg.MessageType,
+			MessageText:      msg.MessageText,
+			MessageUrl:       msg.MessageUrl,
 			Status:           msg.Status,
 			MessageTimestamp: msg.MessageTimestamp,
 			LastMetadata:     metadataJSON,
@@ -220,16 +221,16 @@ func (s *EventService) ProcessHistoricalMessages(ctx context.Context, messages [
 	}
 
 	// --- Post-processing: Submit onboarding tasks if needed (concurrently) ---
-	iter.ForEach(dbMessages, func(dbMsg *model.Message) {
-		// Submit task to onboarding worker pool
-		if submitErr := s.submitOnboardingTaskIfNeeded(ctx, *dbMsg, metadataJSON); submitErr != nil {
-			// Log the submission error, but don't fail the main operation
-			logger.FromContext(ctx).Warn("Failed to submit onboarding task for historical message",
-				zap.String("message_id", dbMsg.MessageID),
-				zap.Error(submitErr),
-			)
-		}
-	})
+	// iter.ForEach(dbMessages, func(dbMsg *model.Message) {
+	// 	// Submit task to onboarding worker pool
+	// 	if submitErr := s.submitOnboardingTaskIfNeeded(ctx, *dbMsg, metadataJSON); submitErr != nil {
+	// 		// Log the submission error, but don't fail the main operation
+	// 		logger.FromContext(ctx).Warn("Failed to submit onboarding task for historical message",
+	// 			zap.String("message_id", dbMsg.MessageID),
+	// 			zap.Error(submitErr),
+	// 		)
+	// 	}
+	// })
 	// --- End Post-processing ---
 
 	log.Info("Successfully processed historical messages",
@@ -291,10 +292,12 @@ func (s *EventService) UpsertMessage(ctx context.Context, payload model.UpsertMe
 	message := model.Message{
 		MessageID:        payload.MessageID,
 		Jid:              payload.Jid,
-		ToUser:           payload.ToUser,
-		FromUser:         payload.FromUser,
+		ToPhone:          payload.ToPhone,
+		FromPhone:        payload.FromPhone,
 		Flow:             payload.Flow,
-		Type:             payload.Type,
+		MessageType:      payload.MessageType,
+		MessageText:      payload.MessageText,
+		MessageUrl:       payload.MessageUrl,
 		Status:           payload.Status,
 		MessageTimestamp: payload.MessageTimestamp,
 		LastMetadata:     metadataJSON,
@@ -485,7 +488,7 @@ func (s *EventService) submitOnboardingTaskIfNeeded(ctx context.Context, message
 	log := logger.FromContext(ctx).With(zap.String("checked_message_id", message.MessageID))
 
 	// 1. Perform quick checks: only submit if it's an incoming message with a 'From' field.
-	if message.Flow != model.MessageFlowIncoming || message.FromUser == "" {
+	if message.Flow != model.MessageFlowIncoming || message.FromPhone == "" {
 		log.Debug("Skipping onboarding task submission: not an applicable message type")
 		return nil
 	}

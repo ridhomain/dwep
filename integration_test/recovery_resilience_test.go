@@ -244,7 +244,7 @@ func (s *MainRecoveryResilienceTestSuite) TestTransactionRollback() {
 			"conversation": "This message should succeed after rollback test",
 		},
 		MessageTimestamp: time.Now().Unix(),
-		FromUser:         jid,
+		FromPhone:        jid,
 		Status:           "sent",
 		Flow:             "IN",
 	}

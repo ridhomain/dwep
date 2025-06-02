@@ -78,8 +78,8 @@ func (s *MessageRepoTestSuite) TestSaveMessage() {
 		CompanyID:        s.CompanyID, // Use suite CompanyID
 		ChatID:           chatID,
 		Jid:              "jid-" + uuid.New().String() + "@s.whatsapp.net",
-		FromUser:         "sender@example.com",
-		ToUser:           "receiver@example.com",
+		FromPhone:        "sender@example.com",
+		ToPhone:          "receiver@example.com",
 		Status:           "DELIVERED",
 		Flow:             "INCOMING",
 		MessageTimestamp: messageTimestamp,

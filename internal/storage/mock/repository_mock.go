@@ -168,18 +168,18 @@ func (m *MessageRepoMock) FindBySender(ctx context.Context, sender string, start
 	return args.Get(0).([]model.Message), args.Error(1)
 }
 
-// FindByFromUser mocks the FindByFromUser method
-func (m *MessageRepoMock) FindByFromUser(ctx context.Context, fromUser string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error) {
-	args := m.Called(ctx, fromUser, startDate, endDate, limit, offset)
+// FindByFromPhone mocks the FindByFromPhone method
+func (m *MessageRepoMock) FindByFromPhone(ctx context.Context, FromPhone string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error) {
+	args := m.Called(ctx, FromPhone, startDate, endDate, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]model.Message), args.Error(1)
 }
 
-// FindByToUser mocks the FindByToUser method
-func (m *MessageRepoMock) FindByToUser(ctx context.Context, toUser string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error) {
-	args := m.Called(ctx, toUser, startDate, endDate, limit, offset)
+// FindByToPhone mocks the FindByToPhone method
+func (m *MessageRepoMock) FindByToPhone(ctx context.Context, ToPhone string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error) {
+	args := m.Called(ctx, ToPhone, startDate, endDate, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

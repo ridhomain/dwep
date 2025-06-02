@@ -173,8 +173,8 @@ func NewMessage(overrideDefaults ...*Message) *Message {
 	msgTimestamp := utils.Now().Add(-time.Duration(gofakeit.Number(1, 100)) * time.Hour).Unix()
 	base := &Message{
 		MessageID:        gofakeit.UUID(),
-		FromUser:         gofakeit.Phone(),
-		ToUser:           gofakeit.Phone(),
+		FromPhone:        gofakeit.Phone(),
+		ToPhone:          gofakeit.Phone(),
 		ChatID:           gofakeit.UUID(),
 		Jid:              gofakeit.UUID() + "@" + gofakeit.RandomString([]string{"s.whatsapp.net", "g.us"}),
 		Flow:             gofakeit.RandomString([]string{MessageFlowOutgoing, MessageFlowIncoming}),
@@ -195,8 +195,8 @@ func NewMessage(overrideDefaults ...*Message) *Message {
 		ovr := overrideDefaults[0]
 		// Allow overriding with empty string by direct assignment
 		base.MessageID = ovr.MessageID
-		base.FromUser = ovr.FromUser
-		base.ToUser = ovr.ToUser
+		base.FromPhone = ovr.FromPhone
+		base.ToPhone = ovr.ToPhone
 		base.ChatID = ovr.ChatID
 		base.Jid = ovr.Jid
 		base.Flow = ovr.Flow

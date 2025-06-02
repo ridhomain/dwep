@@ -69,12 +69,12 @@ func (a *MessageRepoAdapter) FindBySender(ctx context.Context, sender string, st
 	return a.postgres.FindMessagesBySender(ctx, sender, startDate, endDate, limit, offset)
 }
 
-func (a *MessageRepoAdapter) FindByFromUser(ctx context.Context, fromUser string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error) {
-	return a.postgres.FindMessagesByFromUser(ctx, fromUser, startDate, endDate, limit, offset)
+func (a *MessageRepoAdapter) FindByFromPhone(ctx context.Context, FromPhone string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error) {
+	return a.postgres.FindMessagesByFromPhone(ctx, FromPhone, startDate, endDate, limit, offset)
 }
 
-func (a *MessageRepoAdapter) FindByToUser(ctx context.Context, toUser string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error) {
-	return a.postgres.FindMessagesByToUser(ctx, toUser, startDate, endDate, limit, offset)
+func (a *MessageRepoAdapter) FindByToPhone(ctx context.Context, ToPhone string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error) {
+	return a.postgres.FindMessagesByToPhone(ctx, ToPhone, startDate, endDate, limit, offset)
 }
 
 // Save saves a message

@@ -58,19 +58,19 @@ func TestPostgresRepo_SaveMessage_Upsert_New(t *testing.T) {
 	ctx := contextWithTestTenant()
 	message := model.Message{
 		MessageID:        "message-upsert-new-1",
-		FromUser:         "sender1",
-		ToUser:           "receiver1",
+		FromPhone:        "sender1",
+		ToPhone:          "receiver1",
 		ChatID:           testChatID,
 		CompanyID:        testTenantIDChat,
 		MessageTimestamp: time.Now().Unix(),
 		MessageObj:       datatypes.JSON(utils.MustMarshalJSON(map[string]interface{}{"text": "Hello New"})),
 	}
 
-	insertQuery := `INSERT INTO "messages" ("message_id","from_user","to_user","chat_id","jid","flow","agent_id","company_id","message_obj","key","status","is_deleted","message_timestamp","message_date","created_at","updated_at","last_metadata") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL,$10,$11,$12,$13,$14,$15,NULL) ON CONFLICT ("message_id","message_date") DO UPDATE SET "message_id"="excluded"."message_id","from_user"="excluded"."from_user","to_user"="excluded"."to_user","chat_id"="excluded"."chat_id","jid"="excluded"."jid","flow"="excluded"."flow","agent_id"="excluded"."agent_id","company_id"="excluded"."company_id","message_obj"="excluded"."message_obj","key"="excluded"."key","status"="excluded"."status","is_deleted"="excluded"."is_deleted","message_timestamp"="excluded"."message_timestamp","message_date"="excluded"."message_date","updated_at"="excluded"."updated_at","last_metadata"="excluded"."last_metadata" RETURNING "id"`
+	insertQuery := `INSERT INTO "messages" ("message_id","from_phone","to_phone","chat_id","jid","flow","agent_id","company_id","message_obj","key","status","is_deleted","message_timestamp","message_date","created_at","updated_at","last_metadata") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL,$10,$11,$12,$13,$14,$15,NULL) ON CONFLICT ("message_id","message_date") DO UPDATE SET "message_id"="excluded"."message_id","from_phone"="excluded"."from_phone","to_phone"="excluded"."to_phone","chat_id"="excluded"."chat_id","jid"="excluded"."jid","flow"="excluded"."flow","agent_id"="excluded"."agent_id","company_id"="excluded"."company_id","message_obj"="excluded"."message_obj","key"="excluded"."key","status"="excluded"."status","is_deleted"="excluded"."is_deleted","message_timestamp"="excluded"."message_timestamp","message_date"="excluded"."message_date","updated_at"="excluded"."updated_at","last_metadata"="excluded"."last_metadata" RETURNING "id"`
 
 	mock.ExpectQuery(insertQuery).
 		WithArgs(
-			message.MessageID, message.FromUser, message.ToUser, message.ChatID,
+			message.MessageID, message.FromPhone, message.ToPhone, message.ChatID,
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), message.CompanyID,
 			message.MessageObj, sqlmock.AnyArg(), false, message.MessageTimestamp, AnyTime{}, AnyTime{}, AnyTime{},
 		).
@@ -88,8 +88,8 @@ func TestPostgresRepo_SaveMessage_Upsert_Existing(t *testing.T) {
 
 	message := model.Message{
 		MessageID:        "message-upsert-existing-1",
-		FromUser:         "sender1",
-		ToUser:           "receiver1",
+		FromPhone:        "sender1",
+		ToPhone:          "receiver1",
 		ChatID:           testChatID,
 		CompanyID:        testTenantIDChat,
 		MessageTimestamp: now.Unix(),
@@ -97,11 +97,11 @@ func TestPostgresRepo_SaveMessage_Upsert_Existing(t *testing.T) {
 		MessageObj:       datatypes.JSON(utils.MustMarshalJSON(map[string]interface{}{"text": "Hello Updated"})),
 	}
 
-	insertQuery := `INSERT INTO "messages" ("message_id","from_user","to_user","chat_id","jid","flow","agent_id","company_id","message_obj","key","status","is_deleted","message_timestamp","message_date","created_at","updated_at","last_metadata") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL,$10,$11,$12,$13,$14,$15,NULL) ON CONFLICT ("message_id","message_date") DO UPDATE SET "message_id"="excluded"."message_id","from_user"="excluded"."from_user","to_user"="excluded"."to_user","chat_id"="excluded"."chat_id","jid"="excluded"."jid","flow"="excluded"."flow","agent_id"="excluded"."agent_id","company_id"="excluded"."company_id","message_obj"="excluded"."message_obj","key"="excluded"."key","status"="excluded"."status","is_deleted"="excluded"."is_deleted","message_timestamp"="excluded"."message_timestamp","message_date"="excluded"."message_date","updated_at"="excluded"."updated_at","last_metadata"="excluded"."last_metadata" RETURNING "id"`
+	insertQuery := `INSERT INTO "messages" ("message_id","from_phone","to_phone","chat_id","jid","flow","agent_id","company_id","message_obj","key","status","is_deleted","message_timestamp","message_date","created_at","updated_at","last_metadata") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL,$10,$11,$12,$13,$14,$15,NULL) ON CONFLICT ("message_id","message_date") DO UPDATE SET "message_id"="excluded"."message_id","from_phone"="excluded"."from_phone","to_phone"="excluded"."to_phone","chat_id"="excluded"."chat_id","jid"="excluded"."jid","flow"="excluded"."flow","agent_id"="excluded"."agent_id","company_id"="excluded"."company_id","message_obj"="excluded"."message_obj","key"="excluded"."key","status"="excluded"."status","is_deleted"="excluded"."is_deleted","message_timestamp"="excluded"."message_timestamp","message_date"="excluded"."message_date","updated_at"="excluded"."updated_at","last_metadata"="excluded"."last_metadata" RETURNING "id"`
 
 	mock.ExpectQuery(insertQuery).
 		WithArgs(
-			message.MessageID, message.FromUser, message.ToUser, message.ChatID,
+			message.MessageID, message.FromPhone, message.ToPhone, message.ChatID,
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), message.CompanyID,
 			message.MessageObj, message.Status, false, message.MessageTimestamp, AnyTime{}, AnyTime{}, AnyTime{},
 		).
@@ -192,8 +192,8 @@ func TestPostgresRepo_FindMessageByMessageID_Found(t *testing.T) {
 		ID:               100,
 		MessageID:        messageID,
 		CompanyID:        testTenantIDChat,
-		FromUser:         "sender-find",
-		ToUser:           "receiver-find",
+		FromPhone:        "sender-find",
+		ToPhone:          "receiver-find",
 		ChatID:           "chat-find",
 		Jid:              "jid-find",
 		MessageTimestamp: now.Unix(),
@@ -203,9 +203,9 @@ func TestPostgresRepo_FindMessageByMessageID_Found(t *testing.T) {
 		MessageObj:       datatypes.JSON(`{"key": "value"}`),
 	}
 
-	cols := []string{"id", "message_id", "company_id", "from_user", "to_user", "chat_id", "jid", "message_timestamp", "created_at", "updated_at", "message_date", "message_obj"}
+	cols := []string{"id", "message_id", "company_id", "from_phone", "to_phone", "chat_id", "jid", "message_timestamp", "created_at", "updated_at", "message_date", "message_obj"}
 	rows := sqlmock.NewRows(cols).
-		AddRow(expectedMessage.ID, expectedMessage.MessageID, expectedMessage.CompanyID, expectedMessage.FromUser, expectedMessage.ToUser, expectedMessage.ChatID, expectedMessage.Jid, expectedMessage.MessageTimestamp, expectedMessage.CreatedAt, expectedMessage.UpdatedAt, expectedMessage.MessageDate, expectedMessage.MessageObj)
+		AddRow(expectedMessage.ID, expectedMessage.MessageID, expectedMessage.CompanyID, expectedMessage.FromPhone, expectedMessage.ToPhone, expectedMessage.ChatID, expectedMessage.Jid, expectedMessage.MessageTimestamp, expectedMessage.CreatedAt, expectedMessage.UpdatedAt, expectedMessage.MessageDate, expectedMessage.MessageObj)
 
 	selectQuery := `SELECT * FROM "messages" WHERE message_id = $1 AND company_id = $2 ORDER BY "messages"."id" LIMIT $3`
 	mock.ExpectQuery(selectQuery).WithArgs(messageID, testTenantIDChat, 1).WillReturnRows(rows)
@@ -217,8 +217,8 @@ func TestPostgresRepo_FindMessageByMessageID_Found(t *testing.T) {
 	assert.Equal(t, expectedMessage.ID, foundMessage.ID)
 	assert.Equal(t, expectedMessage.MessageID, foundMessage.MessageID)
 	assert.Equal(t, expectedMessage.CompanyID, foundMessage.CompanyID)
-	assert.Equal(t, expectedMessage.FromUser, foundMessage.FromUser)
-	assert.Equal(t, expectedMessage.ToUser, foundMessage.ToUser)
+	assert.Equal(t, expectedMessage.FromPhone, foundMessage.FromPhone)
+	assert.Equal(t, expectedMessage.ToPhone, foundMessage.ToPhone)
 	assert.Equal(t, expectedMessage.Jid, foundMessage.Jid)
 	assert.Equal(t, expectedMessage.MessageTimestamp, foundMessage.MessageTimestamp)
 	assert.JSONEq(t, string(expectedMessage.MessageObj), string(foundMessage.MessageObj))
@@ -241,12 +241,12 @@ func TestPostgresRepo_BulkUpsertMessages_Success(t *testing.T) {
 	ctx := contextWithTestTenant()
 	now := time.Now()
 	messages := []model.Message{
-		{MessageID: "bulk-message-1", CompanyID: testTenantIDChat, FromUser: "sender1", MessageTimestamp: now.Unix(), MessageObj: datatypes.JSON(`{"a":1}`), LastMetadata: datatypes.JSON(`{"b":2}`), MessageDate: model.CreateTimeFromTimestamp(now.Unix())},
-		{MessageID: "bulk-message-2", CompanyID: testTenantIDChat, ToUser: "sender2", MessageTimestamp: now.Unix(), MessageObj: datatypes.JSON(`{"a":1}`), LastMetadata: datatypes.JSON(`{"b":2}`), MessageDate: model.CreateTimeFromTimestamp(now.Unix())},
+		{MessageID: "bulk-message-1", CompanyID: testTenantIDChat, FromPhone: "sender1", MessageTimestamp: now.Unix(), MessageObj: datatypes.JSON(`{"a":1}`), LastMetadata: datatypes.JSON(`{"b":2}`), MessageDate: model.CreateTimeFromTimestamp(now.Unix())},
+		{MessageID: "bulk-message-2", CompanyID: testTenantIDChat, ToPhone: "sender2", MessageTimestamp: now.Unix(), MessageObj: datatypes.JSON(`{"a":1}`), LastMetadata: datatypes.JSON(`{"b":2}`), MessageDate: model.CreateTimeFromTimestamp(now.Unix())},
 	}
 	mock.ExpectBegin()
 
-	insertQuery := `INSERT INTO "messages" ("message_id","from_user","to_user","chat_id","jid","flow","agent_id","company_id","message_obj","key","status","is_deleted","message_timestamp","message_date","created_at","updated_at","last_metadata") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL,$10,$11,$12,$13,$14,$15,$16),($17,$18,$19,$20,$21,$22,$23,$24,$25,NULL,$26,$27,$28,$29,$30,$31,$32) ON CONFLICT ("message_id","message_date") DO UPDATE SET "message_id"="excluded"."message_id","from_user"="excluded"."from_user","to_user"="excluded"."to_user","chat_id"="excluded"."chat_id","jid"="excluded"."jid","flow"="excluded"."flow","agent_id"="excluded"."agent_id","company_id"="excluded"."company_id","message_obj"="excluded"."message_obj","key"="excluded"."key","status"="excluded"."status","is_deleted"="excluded"."is_deleted","message_timestamp"="excluded"."message_timestamp","message_date"="excluded"."message_date","updated_at"="excluded"."updated_at","last_metadata"="excluded"."last_metadata" RETURNING "id"`
+	insertQuery := `INSERT INTO "messages" ("message_id","from_phone","to_phone","chat_id","jid","flow","agent_id","company_id","message_obj","key","status","is_deleted","message_timestamp","message_date","created_at","updated_at","last_metadata") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL,$10,$11,$12,$13,$14,$15,$16),($17,$18,$19,$20,$21,$22,$23,$24,$25,NULL,$26,$27,$28,$29,$30,$31,$32) ON CONFLICT ("message_id","message_date") DO UPDATE SET "message_id"="excluded"."message_id","from_phone"="excluded"."from_phone","to_phone"="excluded"."to_phone","chat_id"="excluded"."chat_id","jid"="excluded"."jid","flow"="excluded"."flow","agent_id"="excluded"."agent_id","company_id"="excluded"."company_id","message_obj"="excluded"."message_obj","key"="excluded"."key","status"="excluded"."status","is_deleted"="excluded"."is_deleted","message_timestamp"="excluded"."message_timestamp","message_date"="excluded"."message_date","updated_at"="excluded"."updated_at","last_metadata"="excluded"."last_metadata" RETURNING "id"`
 
 	mock.ExpectQuery(insertQuery).WithArgs(
 		messages[0].MessageID,
@@ -270,14 +270,14 @@ func TestPostgresRepo_BulkUpsertMessages_SkipMismatchedTenant(t *testing.T) {
 	ctx := contextWithTestTenant()
 	now := time.Now()
 	messages := []model.Message{
-		{MessageID: "bulk-message-ok-1", CompanyID: testTenantIDChat, FromUser: "sender1", MessageTimestamp: now.Unix()},
-		{MessageID: "bulk-message-wrong", CompanyID: "wrong-tenant", FromUser: "sender2", MessageTimestamp: now.Unix()},
-		{MessageID: "bulk-message-ok-2", CompanyID: testTenantIDChat, FromUser: "sender3", MessageTimestamp: now.Unix()},
+		{MessageID: "bulk-message-ok-1", CompanyID: testTenantIDChat, FromPhone: "sender1", MessageTimestamp: now.Unix()},
+		{MessageID: "bulk-message-wrong", CompanyID: "wrong-tenant", FromPhone: "sender2", MessageTimestamp: now.Unix()},
+		{MessageID: "bulk-message-ok-2", CompanyID: testTenantIDChat, FromPhone: "sender3", MessageTimestamp: now.Unix()},
 	}
 
 	mock.ExpectBegin()
 
-	insertQuery := `INSERT INTO "messages" ("message_id","from_user","to_user","chat_id","jid","flow","agent_id","company_id","message_obj","key","status","is_deleted","message_timestamp","message_date","created_at","updated_at","last_metadata") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULL,NULL,$9,$10,$11,$12,$13,$14,NULL),($15,$16,$17,$18,$19,$20,$21,$22,NULL,NULL,$23,$24,$25,$26,$27,$28,NULL) ON CONFLICT ("message_id","message_date") DO UPDATE SET "message_id"="excluded"."message_id","from_user"="excluded"."from_user","to_user"="excluded"."to_user","chat_id"="excluded"."chat_id","jid"="excluded"."jid","flow"="excluded"."flow","agent_id"="excluded"."agent_id","company_id"="excluded"."company_id","message_obj"="excluded"."message_obj","key"="excluded"."key","status"="excluded"."status","is_deleted"="excluded"."is_deleted","message_timestamp"="excluded"."message_timestamp","message_date"="excluded"."message_date","updated_at"="excluded"."updated_at","last_metadata"="excluded"."last_metadata" RETURNING "id"`
+	insertQuery := `INSERT INTO "messages" ("message_id","from_phone","to_phone","chat_id","jid","flow","agent_id","company_id","message_obj","key","status","is_deleted","message_timestamp","message_date","created_at","updated_at","last_metadata") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULL,NULL,$9,$10,$11,$12,$13,$14,NULL),($15,$16,$17,$18,$19,$20,$21,$22,NULL,NULL,$23,$24,$25,$26,$27,$28,NULL) ON CONFLICT ("message_id","message_date") DO UPDATE SET "message_id"="excluded"."message_id","from_phone"="excluded"."from_phone","to_phone"="excluded"."to_phone","chat_id"="excluded"."chat_id","jid"="excluded"."jid","flow"="excluded"."flow","agent_id"="excluded"."agent_id","company_id"="excluded"."company_id","message_obj"="excluded"."message_obj","key"="excluded"."key","status"="excluded"."status","is_deleted"="excluded"."is_deleted","message_timestamp"="excluded"."message_timestamp","message_date"="excluded"."message_date","updated_at"="excluded"."updated_at","last_metadata"="excluded"."last_metadata" RETURNING "id"`
 
 	mock.ExpectQuery(insertQuery).WithArgs(
 		messages[0].MessageID,
@@ -361,11 +361,11 @@ func TestPostgresRepo_FindMessagesBySender_Found(t *testing.T) {
 	endDate := now.AddDate(0, 1, 0)
 	limit := 10
 	offset := 0
-	cols := []string{"id", "message_id", "company_id", "from_user", "created_at", "updated_at", "message_date"}
+	cols := []string{"id", "message_id", "company_id", "from_phone", "created_at", "updated_at", "message_date"}
 	rows := sqlmock.NewRows(cols).
 		AddRow(1, "message-sender-1", testTenantIDChat, sender, now.Add(-time.Hour), now.Add(-time.Minute), now).
 		AddRow(2, "message-sender-2", testTenantIDChat, sender, now.Add(-2*time.Hour), now.Add(-2*time.Minute), now)
-	selectQuery := `SELECT * FROM "messages" WHERE "from_user" = $1 AND company_id = $2 AND message_date >= $3 AND message_date <= $4 ORDER BY message_timestamp DESC LIMIT $5`
+	selectQuery := `SELECT * FROM "messages" WHERE "from_phone" = $1 AND company_id = $2 AND message_date >= $3 AND message_date <= $4 ORDER BY message_timestamp DESC LIMIT $5`
 	mock.ExpectQuery(selectQuery).WithArgs(sender, testTenantIDChat, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), limit).WillReturnRows(rows)
 	found, err := repo.FindMessagesBySender(ctx, sender, startDate, endDate, limit, offset)
 	assert.NoError(t, err)
@@ -385,93 +385,93 @@ func TestPostgresRepo_FindMessagesBySender_NotFound(t *testing.T) {
 	endDate := now.AddDate(0, 1, 0)
 	limit := 10
 	offset := 0
-	selectQuery := `SELECT * FROM "messages" WHERE "from_user" = $1 AND company_id = $2 AND message_date >= $3 AND message_date <= $4 ORDER BY message_timestamp DESC LIMIT $5`
-	mock.ExpectQuery(selectQuery).WithArgs(sender, testTenantIDChat, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), limit).WillReturnRows(sqlmock.NewRows([]string{"id", "message_id", "company_id", "from_user"}))
+	selectQuery := `SELECT * FROM "messages" WHERE "from_phone" = $1 AND company_id = $2 AND message_date >= $3 AND message_date <= $4 ORDER BY message_timestamp DESC LIMIT $5`
+	mock.ExpectQuery(selectQuery).WithArgs(sender, testTenantIDChat, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), limit).WillReturnRows(sqlmock.NewRows([]string{"id", "message_id", "company_id", "from_phone"}))
 	found, err := repo.FindMessagesBySender(ctx, sender, startDate, endDate, limit, offset)
 	assert.NoError(t, err)
 	assert.NotNil(t, found)
 	assert.Len(t, found, 0)
 }
 
-func TestPostgresRepo_FindMessagesByFromUser_Found(t *testing.T) {
+func TestPostgresRepo_FindMessagesByFromPhone_Found(t *testing.T) {
 	repo, mock, teardown := newTestMessageRepoWithMatcher(t, sqlmock.QueryMatcherEqual)
 	t.Cleanup(teardown)
 	ctx := contextWithTestTenant()
 	now := time.Now()
-	fromUser := "user-from_user-test"
+	FromPhone := "user-from_phone-test"
 	startDate := now.AddDate(0, -1, 0)
 	endDate := now.AddDate(0, 1, 0)
 	limit := 10
 	offset := 0
-	cols := []string{"id", "message_id", "company_id", "from_user", "created_at", "updated_at", "message_date"}
+	cols := []string{"id", "message_id", "company_id", "from_phone", "created_at", "updated_at", "message_date"}
 	rows := sqlmock.NewRows(cols).
-		AddRow(1, "message-from_user-1", testTenantIDChat, fromUser, now.Add(-time.Hour), now.Add(-time.Minute), now).
-		AddRow(2, "message-from_user-2", testTenantIDChat, fromUser, now.Add(-2*time.Hour), now.Add(-2*time.Minute), now)
-	selectQuery := `SELECT * FROM "messages" WHERE "from_user" = $1 AND company_id = $2 AND message_date >= $3 AND message_date <= $4 ORDER BY message_timestamp DESC LIMIT $5`
-	mock.ExpectQuery(selectQuery).WithArgs(fromUser, testTenantIDChat, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), limit).WillReturnRows(rows)
-	found, err := repo.FindMessagesByFromUser(ctx, fromUser, startDate, endDate, limit, offset)
+		AddRow(1, "message-from_phone-1", testTenantIDChat, FromPhone, now.Add(-time.Hour), now.Add(-time.Minute), now).
+		AddRow(2, "message-from_phone-2", testTenantIDChat, FromPhone, now.Add(-2*time.Hour), now.Add(-2*time.Minute), now)
+	selectQuery := `SELECT * FROM "messages" WHERE "from_phone" = $1 AND company_id = $2 AND message_date >= $3 AND message_date <= $4 ORDER BY message_timestamp DESC LIMIT $5`
+	mock.ExpectQuery(selectQuery).WithArgs(FromPhone, testTenantIDChat, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), limit).WillReturnRows(rows)
+	found, err := repo.FindMessagesByFromPhone(ctx, FromPhone, startDate, endDate, limit, offset)
 	assert.NoError(t, err)
 	assert.NotNil(t, found)
 	assert.Len(t, found, 2)
-	assert.Equal(t, "message-from_user-1", found[0].MessageID)
-	assert.Equal(t, "message-from_user-2", found[1].MessageID)
+	assert.Equal(t, "message-from_phone-1", found[0].MessageID)
+	assert.Equal(t, "message-from_phone-2", found[1].MessageID)
 }
 
-func TestPostgresRepo_FindMessagesByFromUser_NotFound(t *testing.T) {
+func TestPostgresRepo_FindMessagesByFromPhone_NotFound(t *testing.T) {
 	repo, mock, teardown := newTestMessageRepoWithMatcher(t, sqlmock.QueryMatcherEqual)
 	t.Cleanup(teardown)
 	ctx := contextWithTestTenant()
 	now := time.Now()
-	fromUser := "user-from_user-notfound"
+	FromPhone := "user-from_phone-notfound"
 	startDate := now.AddDate(0, -1, 0)
 	endDate := now.AddDate(0, 1, 0)
 	limit := 10
 	offset := 0
-	selectQuery := `SELECT * FROM "messages" WHERE "from_user" = $1 AND company_id = $2 AND message_date >= $3 AND message_date <= $4 ORDER BY message_timestamp DESC LIMIT $5`
-	mock.ExpectQuery(selectQuery).WithArgs(fromUser, testTenantIDChat, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), limit).WillReturnRows(sqlmock.NewRows([]string{"id", "message_id", "company_id", "from_user"}))
-	found, err := repo.FindMessagesByFromUser(ctx, fromUser, startDate, endDate, limit, offset)
+	selectQuery := `SELECT * FROM "messages" WHERE "from_phone" = $1 AND company_id = $2 AND message_date >= $3 AND message_date <= $4 ORDER BY message_timestamp DESC LIMIT $5`
+	mock.ExpectQuery(selectQuery).WithArgs(FromPhone, testTenantIDChat, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), limit).WillReturnRows(sqlmock.NewRows([]string{"id", "message_id", "company_id", "from_phone"}))
+	found, err := repo.FindMessagesByFromPhone(ctx, FromPhone, startDate, endDate, limit, offset)
 	assert.NoError(t, err)
 	assert.NotNil(t, found)
 	assert.Len(t, found, 0)
 }
 
-func TestPostgresRepo_FindMessagesByToUser_Found(t *testing.T) {
+func TestPostgresRepo_FindMessagesByToPhone_Found(t *testing.T) {
 	repo, mock, teardown := newTestMessageRepoWithMatcher(t, sqlmock.QueryMatcherEqual)
 	t.Cleanup(teardown)
 	ctx := contextWithTestTenant()
 	now := time.Now()
-	toUser := "user-to_user-test"
+	ToPhone := "user-to_phone-test"
 	startDate := now.AddDate(0, -1, 0)
 	endDate := now.AddDate(0, 1, 0)
 	limit := 10
 	offset := 0
-	cols := []string{"id", "message_id", "company_id", "to_user", "created_at", "updated_at", "message_date"}
+	cols := []string{"id", "message_id", "company_id", "to_phone", "created_at", "updated_at", "message_date"}
 	rows := sqlmock.NewRows(cols).
-		AddRow(1, "message-to_user-1", testTenantIDChat, toUser, now.Add(-time.Hour), now.Add(-time.Minute), now).
-		AddRow(2, "message-to_user-2", testTenantIDChat, toUser, now.Add(-2*time.Hour), now.Add(-2*time.Minute), now)
-	selectQuery := `SELECT * FROM "messages" WHERE "to_user" = $1 AND company_id = $2 AND message_date >= $3 AND message_date <= $4 ORDER BY message_timestamp DESC LIMIT $5`
-	mock.ExpectQuery(selectQuery).WithArgs(toUser, testTenantIDChat, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), limit).WillReturnRows(rows)
-	found, err := repo.FindMessagesByToUser(ctx, toUser, startDate, endDate, limit, offset)
+		AddRow(1, "message-to_phone-1", testTenantIDChat, ToPhone, now.Add(-time.Hour), now.Add(-time.Minute), now).
+		AddRow(2, "message-to_phone-2", testTenantIDChat, ToPhone, now.Add(-2*time.Hour), now.Add(-2*time.Minute), now)
+	selectQuery := `SELECT * FROM "messages" WHERE "to_phone" = $1 AND company_id = $2 AND message_date >= $3 AND message_date <= $4 ORDER BY message_timestamp DESC LIMIT $5`
+	mock.ExpectQuery(selectQuery).WithArgs(ToPhone, testTenantIDChat, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), limit).WillReturnRows(rows)
+	found, err := repo.FindMessagesByToPhone(ctx, ToPhone, startDate, endDate, limit, offset)
 	assert.NoError(t, err)
 	assert.NotNil(t, found)
 	assert.Len(t, found, 2)
-	assert.Equal(t, "message-to_user-1", found[0].MessageID)
-	assert.Equal(t, "message-to_user-2", found[1].MessageID)
+	assert.Equal(t, "message-to_phone-1", found[0].MessageID)
+	assert.Equal(t, "message-to_phone-2", found[1].MessageID)
 }
 
-func TestPostgresRepo_FindMessagesByToUser_NotFound(t *testing.T) {
+func TestPostgresRepo_FindMessagesByToPhone_NotFound(t *testing.T) {
 	repo, mock, teardown := newTestMessageRepoWithMatcher(t, sqlmock.QueryMatcherEqual)
 	t.Cleanup(teardown)
 	ctx := contextWithTestTenant()
 	now := time.Now()
-	toUser := "user-to_user-notfound"
+	ToPhone := "user-to_phone-notfound"
 	startDate := now.AddDate(0, -1, 0)
 	endDate := now.AddDate(0, 1, 0)
 	limit := 10
 	offset := 0
-	selectQuery := `SELECT * FROM "messages" WHERE "to_user" = $1 AND company_id = $2 AND message_date >= $3 AND message_date <= $4 ORDER BY message_timestamp DESC LIMIT $5`
-	mock.ExpectQuery(selectQuery).WithArgs(toUser, testTenantIDChat, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), limit).WillReturnRows(sqlmock.NewRows([]string{"id", "message_id", "company_id", "to_user"}))
-	found, err := repo.FindMessagesByToUser(ctx, toUser, startDate, endDate, limit, offset)
+	selectQuery := `SELECT * FROM "messages" WHERE "to_phone" = $1 AND company_id = $2 AND message_date >= $3 AND message_date <= $4 ORDER BY message_timestamp DESC LIMIT $5`
+	mock.ExpectQuery(selectQuery).WithArgs(ToPhone, testTenantIDChat, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"), limit).WillReturnRows(sqlmock.NewRows([]string{"id", "message_id", "company_id", "to_phone"}))
+	found, err := repo.FindMessagesByToPhone(ctx, ToPhone, startDate, endDate, limit, offset)
 	assert.NoError(t, err)
 	assert.NotNil(t, found)
 	assert.Len(t, found, 0)

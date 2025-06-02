@@ -16,12 +16,14 @@ const (
 type Message struct {
 	ID               int64          `json:"-" gorm:"column:id;primaryKey;autoIncrement"`
 	MessageID        string         `json:"id" gorm:"column:message_id;index"`
-	FromUser         string         `json:"from_user,omitempty" gorm:"column:from_user;index"`
-	ToUser           string         `json:"to_user,omitempty" gorm:"column:to_user;index"`
+	FromPhone        string         `json:"from_phone,omitempty" gorm:"column:from_phone;index"`
+	ToPhone          string         `json:"to_phone,omitempty" gorm:"column:to_phone;index"`
 	ChatID           string         `json:"chat_id,omitempty" gorm:"column:chat_id;index"`
 	Jid              string         `json:"jid,omitempty" gorm:"column:jid;index"`
 	Flow             string         `json:"flow,omitempty" gorm:"column:flow"`
-	Type             string         `json:"type,omitempty" gorm:"column:type"`
+	MessageText      string         `json:"message_text,omitempty" gorm:"column:message_text"`
+	MessageUrl       string         `json:"message_url,omitempty" gorm:"column:message_url"`
+	MessageType      string         `json:"message_type,omitempty" gorm:"column:message_type"`
 	AgentID          string         `json:"agent_id,omitempty" gorm:"column:agent_id;index"`
 	CompanyID        string         `json:"company_id,omitempty" gorm:"column:company_id"` // CompanyID is implicitly the tenant ID
 	MessageObj       datatypes.JSON `json:"message_obj,omitempty" gorm:"type:jsonb;column:message_obj"`
@@ -55,7 +57,9 @@ func (m *Message) GetUpdatableFields() []string {
 	// List all fields except 'id' and 'created_at'
 	// Ensure these names match the gorm:"column:..." tags
 	return []string{
-		"from_user", "to_user", "chat_id", "type", "jid", "flow", "key", "status", "message_timestamp", "message_date", "updated_at", "last_metadata",
+		"from_phone", "to_phone", "chat_id", "message_type", "jid", "flow", "key",
+		"status", "message_timestamp", "message_date", "updated_at", "last_metadata",
+		"message_text", "message_url",
 	}
 }
 
@@ -63,7 +67,9 @@ func MessageUpdatableFields() []string {
 	// List all fields except 'id' and 'created_at'
 	// Ensure these names match the gorm:"column:..." tags
 	return []string{
-		"from_user", "to_user", "chat_id", "type", "jid", "flow", "key", "status", "message_timestamp", "message_date", "updated_at", "last_metadata",
+		"from_phone", "to_phone", "chat_id", "message_type", "jid", "flow", "key",
+		"status", "message_timestamp", "message_date", "updated_at", "last_metadata",
+		"message_text", "message_url",
 	}
 }
 

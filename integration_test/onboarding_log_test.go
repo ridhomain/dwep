@@ -42,8 +42,8 @@ func (s *OnboardingLogTestSuite) SetupTest() {
 func (s *OnboardingLogTestSuite) generateOnboardingMessagePayload(t require.TestingT, tenantID, phoneNumber, messageID string) []byte {
 	payload := model.UpsertMessagePayload{
 		MessageID:        messageID,
-		ToUser:           "agent-onboarding-test",
-		FromUser:         phoneNumber, // Key field for onboarding
+		ToPhone:          "agent-onboarding-test",
+		FromPhone:        phoneNumber, // Key field for onboarding
 		ChatID:           fmt.Sprintf("chat-onboarding-%s", uuid.NewString()),
 		Jid:              fmt.Sprintf("%s@s.whatsapp.net", phoneNumber),
 		Flow:             "IN", // Must be IN flow

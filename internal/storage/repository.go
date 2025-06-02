@@ -27,8 +27,8 @@ type MessageRepo interface {
 
 	FindByJID(ctx context.Context, jid string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error)
 	FindBySender(ctx context.Context, sender string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error)
-	FindByFromUser(ctx context.Context, fromUser string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error)
-	FindByToUser(ctx context.Context, toUser string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error)
+	FindByFromPhone(ctx context.Context, FromPhone string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error)
+	FindByToPhone(ctx context.Context, ToPhone string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error)
 
 	Close(ctx context.Context) error
 }

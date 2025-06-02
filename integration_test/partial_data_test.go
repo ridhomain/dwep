@@ -152,7 +152,7 @@ func (s *PartialDataTestSuite) TestPartialMessageUpdate() {
 			"conversation": "Initial message content",
 		},
 		MessageTimestamp: time.Now().Unix(),
-		FromUser:         jid, // Assuming sender is the JID for simplicity. JSON key is "from_me" for boolean, or "from" for string sender id
+		FromPhone:        jid, // Assuming sender is the JID for simplicity. JSON key is "from_me" for boolean, or "from" for string sender id
 		Status:           "sent",
 		Flow:             "IN",
 		// MessageType:       "text", // Add if present in UpsertMessagePayload

@@ -510,11 +510,13 @@ func NewPostgresRepo(dsn string, autoMigrate bool, companyID string) (*PostgresR
 	CREATE TABLE %q.messages (
 		id BIGSERIAL NOT NULL,
 		message_id TEXT,
-		from_user TEXT,
-		to_user TEXT,
+		from_phone TEXT,
+		to_phone TEXT,
 		chat_id TEXT,
 		jid TEXT,
-		type TEXT,
+		message_text TEXT,
+		message_url TEXT,
+		message_type TEXT,
 		company_id VARCHAR,
 		key JSONB,
 		edited_message_obj JSONB,
@@ -548,8 +550,8 @@ func NewPostgresRepo(dsn string, autoMigrate bool, companyID string) (*PostgresR
 	// Note: company_id is not included as indexing is within the tenant-specific schema.
 	indexes := map[string]string{
 		"idx_messages_message_id":        fmt.Sprintf("CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_message_id ON %q.messages USING btree (message_id, message_date);", schemaName),
-		"idx_messages_from_user":         fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_messages_from ON %q.messages USING btree (from_user);`, schemaName),
-		"idx_messages_to_user":           fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_messages_to ON %q.messages USING btree (to_user);`, schemaName),
+		"idx_messages_from_phone":        fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_messages_from ON %q.messages USING btree (from_phone);`, schemaName),
+		"idx_messages_to_phone":          fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_messages_to ON %q.messages USING btree (to_phone);`, schemaName),
 		"idx_messages_chat_id":           fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON %q.messages USING btree (chat_id);", schemaName),
 		"idx_messages_jid":               fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_messages_jid ON %q.messages USING btree (jid);", schemaName),
 		"idx_messages_agent_id":          fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_messages_agent_id ON %q.messages USING btree (agent_id);", schemaName),

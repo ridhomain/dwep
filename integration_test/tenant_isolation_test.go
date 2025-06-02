@@ -179,7 +179,7 @@ func (s *TenantIsolationTestSuite) TestMissingTenantID() {
 		// CompanyID: "", // Omitted or explicitly set to empty string
 		MessageObj:       map[string]interface{}{"text": "Message without tenant ID"},
 		MessageTimestamp: time.Now().Unix(),
-		FromUser:         "6281234567890@s.whatsapp.net",
+		FromPhone:        "6281234567890@s.whatsapp.net",
 		Status:           "sent",
 	})
 	s.Require().NoError(err, "Failed to generate message without tenant ID")

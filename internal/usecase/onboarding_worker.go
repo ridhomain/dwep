@@ -140,16 +140,16 @@ func (w *OnboardingWorker) processOnboardingTask(taskData OnboardingTaskData) {
 	taskCtx := tenant.WithCompanyID(taskData.Ctx, taskData.Message.CompanyID)
 
 	// 1. Basic check (already done before submitting, but double-check)
-	if taskData.Message.Flow != model.MessageFlowIncoming || taskData.Message.FromUser == "" {
+	if taskData.Message.Flow != model.MessageFlowIncoming || taskData.Message.FromPhone == "" {
 		log.Debug("Skipping onboarding task: not applicable message type")
 		observer.IncOnboardingTasksProcessed(taskData.Message.CompanyID, "skipped_not_applicable")
 		return
 	}
 
 	// 2. Clean and validate phone number
-	phoneNumber := cleanPhoneNumber(taskData.Message.FromUser)
+	phoneNumber := cleanPhoneNumber(taskData.Message.FromPhone)
 	if phoneNumber == "" {
-		log.Warn("Skipping onboarding task: empty phone number after cleaning", zap.String("original_from", taskData.Message.FromUser))
+		log.Warn("Skipping onboarding task: empty phone number after cleaning", zap.String("original_from", taskData.Message.FromPhone))
 		observer.IncOnboardingTasksProcessed(taskData.Message.CompanyID, "skipped_empty_phone")
 		return
 	}
