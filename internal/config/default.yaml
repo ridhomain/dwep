@@ -10,7 +10,7 @@ server:
 
 # NATS JetStream configuration
 nats:
-  url: nats://admin:admin@:30315
+  url: nats://admin:admin@nats
   realtime:
     maxAge: 30
     stream: wa_events_stream
@@ -70,4 +70,4 @@ workerPools:
     poolSize: 10       # Number of concurrent workers processing onboarding logs
     queueSize: 10000   # Buffer size for pending onboarding tasks
     maxBlock: 1s     # Max time to wait if queue is full before returning error
-    expiryTime: 1m   # How long an idle worker waits before shutting down
+    expiryTime: 1m   # How long an idle worker waits before shutting down 

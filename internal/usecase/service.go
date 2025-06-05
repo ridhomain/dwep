@@ -27,7 +27,7 @@ func NewEventService(
 	agentRepo storage.AgentRepo,
 	onboardingLogRepo storage.OnboardingLogRepo,
 	exhaustedEventRepo storage.ExhaustedEventRepo,
-	onboardingWorker IOnboardingWorker,
+	onboardingWorker IOnboardingWorker, // Use the interface type
 ) *EventService {
 	return &EventService{
 		chatRepo:           chatRepo,

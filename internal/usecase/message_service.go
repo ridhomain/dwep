@@ -241,12 +241,6 @@ func (s *EventService) ProcessHistoricalMessages(ctx context.Context, messages [
 		zap.Int("count", len(dbMessages)),
 		zap.Duration("duration", time.Since(start)),
 	)
-
-	// Start historical sync after delay
-	if s.shouldStartHistoricalSync(ctx) {
-		go s.ProcessHistoricalSyncAfterDelay(ctx, companyID, 15)
-	}
-
 	return nil
 }
 
@@ -369,7 +363,7 @@ func (s *EventService) UpsertMessage(ctx context.Context, payload model.UpsertMe
 
 	// --- Post-processing: Submit onboarding task if needed ---
 	// Call the helper function to submit the task, log any submission error but don't fail the upsert
-	if submitErr := s.submitOnboardingTaskIfNeeded(ctx, message, metadataJSON, payload.OnboardingMetadata); submitErr != nil {
+	if submitErr := s.submitOnboardingTaskIfNeeded(ctx, message, metadataJSON); submitErr != nil {
 		log.Warn("Failed to submit onboarding task after message upsert",
 			zap.String("message_id", message.MessageID),
 			zap.Error(submitErr),
@@ -498,17 +492,12 @@ func (s *EventService) UpdateMessage(ctx context.Context, payload model.UpdateMe
 // entry and submits the task to the worker pool if required.
 // It performs preliminary checks (flow type, 'from' field) before submission.
 // Returns an error only if there was an issue submitting the task to the pool.
-func (s *EventService) submitOnboardingTaskIfNeeded(ctx context.Context, message model.Message, metadataJSON datatypes.JSON, onboardingMetadata map[string]interface{},
-) error {
+func (s *EventService) submitOnboardingTaskIfNeeded(ctx context.Context, message model.Message, metadataJSON datatypes.JSON) error {
 	log := logger.FromContext(ctx).With(zap.String("checked_message_id", message.MessageID))
 
 	// 1. Perform quick checks: only submit if it's an incoming message with a 'From' field.
 	if message.Flow != model.MessageFlowIncoming || message.FromPhone == "" {
 		log.Debug("Skipping onboarding task submission: not an applicable message type")
-		return nil
-	}
-
-	if onboardingMetadata == nil {
 		return nil
 	}
 
@@ -532,10 +521,4 @@ func (s *EventService) submitOnboardingTaskIfNeeded(ctx context.Context, message
 
 	log.Debug("Successfully submitted onboarding task to worker pool")
 	return nil
-}
-
-func (s *EventService) shouldStartHistoricalSync(ctx context.Context) bool {
-	// Implement logic to determine if this is the end of historical processing
-	// For example, check if this is the last batch or use a flag
-	return true
 }

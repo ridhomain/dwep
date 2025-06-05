@@ -92,11 +92,6 @@ func (a *MessageRepoAdapter) FindByMessageID(ctx context.Context, messageID stri
 	return a.postgres.FindMessageByMessageID(ctx, messageID)
 }
 
-// FindFirstMessageByPhoneNumber finds first message by phone number
-func (a *MessageRepoAdapter) FindFirstMessageByPhoneNumber(ctx context.Context, phoneNumber string) (*model.Message, error) {
-	return a.postgres.FindFirstMessageByPhoneNumber(ctx, phoneNumber)
-}
-
 // BulkUpsert performs a bulk upsert of messages
 func (a *MessageRepoAdapter) BulkUpsert(ctx context.Context, messages []model.Message) error {
 	return a.postgres.BulkUpsertMessages(ctx, messages)

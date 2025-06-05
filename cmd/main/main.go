@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"strconv"
@@ -75,11 +74,15 @@ func main() {
 	exhaustedEventRepo := storage.NewExhaustedEventRepoAdapter(postgresRepo)
 
 	// Create onboarding worker pool
-	onboardingWorker, err := initializeOnboardingWorker(cfg, repos, logger, companyID)
+	onboardingWorker, err := usecase.NewOnboardingWorker(
+		cfg.WorkerPools.Onboarding,
+		contactRepo,
+		onboardingLogRepo,
+		logger.Log, // Pass the base logger
+	)
 	if err != nil {
-		log.Fatal("Failed to initialize onboarding worker", zap.Error(err))
+		logger.Log.Fatal("Failed to initialize onboarding worker pool", zap.Error(err))
 	}
-	defer onboardingWorker.Stop()
 
 	// Create service, injecting the worker pool
 	service := usecase.NewEventService(chatRepo, messageRepo, contactRepo, agentRepo, onboardingLogRepo, exhaustedEventRepo, onboardingWorker)
@@ -297,20 +300,4 @@ func initJetStreamClient(url string) (*jetstream.Client, error) {
 	}
 	// Note: Stream and consumer setup is now handled within the processor/consumer Setup methods
 	return client, nil
-}
-
-func initializeOnboardingWorker(cfg *config.Config, repos *storage.Repositories, logger *zap.Logger, companyID string) (IOnboardingWorker, error) {
-	// Create optimized worker with bloom filters
-	worker, err := usecase.NewOnboardingWorker(
-		cfg.Onboarding.Worker,
-		repos.Contact,
-		repos.OnboardingLog,
-		logger,
-		companyID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create onboarding worker: %w", err)
-	}
-
-	return worker, nil
 }
