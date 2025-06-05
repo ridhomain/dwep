@@ -68,6 +68,30 @@ type ConsumerNatsConfig struct {
 	NakMaxDelay  time.Duration `mapstructure:"nakMaxDelay"`  // Maximum delay for exponential backoff NAK
 }
 
+// OnboardingWorker Configs
+type OnboardingConfig struct {
+	Worker WorkerConfig `mapstructure:"worker"`
+	Bloom  BloomConfig  `mapstructure:"bloom"`
+	Batch  BatchConfig  `mapstructure:"batch"`
+}
+
+type WorkerConfig struct {
+	PoolSize   int           `mapstructure:"pool_size" default:"50"`
+	QueueSize  int           `mapstructure:"queue_size" default:"10000"`
+	ExpiryTime time.Duration `mapstructure:"expiry_time" default:"10m"`
+}
+
+type BloomConfig struct {
+	ExpectedOnboarded uint    `mapstructure:"expected_onboarded" default:"500000"`
+	ExpectedNonExist  uint    `mapstructure:"expected_nonexist" default:"100000"`
+	FalsePositiveRate float64 `mapstructure:"false_positive_rate" default:"0.01"`
+}
+
+type BatchConfig struct {
+	Size          int           `mapstructure:"size" default:"100"`
+	FlushInterval time.Duration `mapstructure:"flush_interval" default:"5s"`
+}
+
 // LoadConfig reads configuration from file or environment variables
 func LoadConfig(path string) (*Config, error) {
 	// Create new viper instance

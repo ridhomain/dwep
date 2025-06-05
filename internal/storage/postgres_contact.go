@@ -395,3 +395,49 @@ func (r *PostgresRepo) BulkUpsertContacts(ctx context.Context, contacts []model.
 	}
 	return nil
 }
+
+func (r *PostgresRepo) FindContactsByOriginPaginated(ctx context.Context, origin string, limit, offset int) ([]model.Contact, error) {
+	companyID, err := tenant.FromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to get tenant ID: %w", apperrors.ErrUnauthorized, err)
+	}
+	loggerCtx := logger.FromContext(ctx)
+
+	var contacts []model.Contact
+	operation := func() error {
+		query := r.db.WithContext(ctx).Where("company_id = ?", companyID)
+
+		if origin == "" {
+			query = query.Where("(origin IS NULL OR origin = '')")
+		} else {
+			query = query.Where("origin = ?", origin)
+		}
+
+		result := query.
+			Limit(limit).
+			Offset(offset).
+			Order("created_at ASC").
+			Find(&contacts)
+
+		if result.Error != nil {
+			return fmt.Errorf("%w: query failed: %w", apperrors.ErrDatabase, result.Error)
+		}
+		return nil
+	}
+
+	readPolicy := newRetryPolicy(ctx, readRetryMaxElapsedTime)
+	startTime := utils.Now()
+	findErr := retryableOperation(ctx, readPolicy, "FindContactsByOriginPaginated", operation)
+	observer.ObserveDbOperationDuration("find_by_origin_paginated", "contact", companyID, time.Since(startTime), findErr)
+
+	if findErr != nil {
+		loggerCtx.Error("Failed to find contacts by origin",
+			zap.String("origin", origin),
+			zap.Int("limit", limit),
+			zap.Int("offset", offset),
+			zap.Error(findErr))
+		return nil, findErr
+	}
+
+	return contacts, nil
+}

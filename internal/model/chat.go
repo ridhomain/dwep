@@ -36,16 +36,13 @@ func (Chat) TableName(namer schema.Namer) string {
 func (c *Chat) GetUpdatableFields() []string {
 	// Excludes id, created_at, chat_id, company_id (part of conflict target)
 	return []string{
-		"jid", "push_name", "is_group", "group_name",
-		"unread_count", "last_message", "conversation_timestamp",
-		"not_spam", "agent_id", "phone_number", "last_metadata", "updated_at",
+		"push_name", "group_name", "unread_count", "last_message", "conversation_timestamp", "last_metadata", "updated_at",
 	}
 }
 
 func ChatUpdatableFields() []string {
 	// Excludes id, created_at, chat_id, company_id (part of conflict target)
 	return []string{
-		"jid", "is_group", "group_name", "unread_count", "last_message", "conversation_timestamp",
-		"not_spam", "agent_id", "phone_number", "last_metadata", "updated_at",
+		"push_name", "group_name", "unread_count", "last_message", "conversation_timestamp", "last_metadata", "updated_at",
 	}
 }

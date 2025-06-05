@@ -44,14 +44,14 @@ type UpsertMessagePayload struct {
 	ChatID           string                 `json:"chat_id,omitempty" validate:"required"`
 	Jid              string                 `json:"jid,omitempty" validate:"required"`
 	Flow             string                 `json:"flow,omitempty" validate:"required,oneof=IN OUT"` // Flow indicates the direction of the message (IN or OUT)
-	MessageType      string                 `json:"message_type,omitempty" validate:"required"`
-	MessageText      string                 `json:"message_text,omitempty" validate:"required"`
-	MessageUrl       string                 `json:"message_url,omitempty" validate:"required"`
+	MessageType      string                 `json:"message_type,omitempty" validate:"omitempty"`
+	MessageText      string                 `json:"message_text,omitempty" validate:"omitempty"`
+	MessageUrl       string                 `json:"message_url,omitempty" validate:"omitempty"`
 	CompanyID        string                 `json:"company_id,omitempty" validate:"required"`
 	AgentID          string                 `json:"agent_id,omitempty" validate:"required"`
 	Key              *KeyPayload            `json:"key,omitempty" validate:"omitempty"`
 	MessageObj       map[string]interface{} `json:"message_obj,omitempty" validate:"omitempty"`
-	Status           string                 `json:"status,omitempty" validate:"required"`
+	Status           string                 `json:"status,omitempty" validate:"omitempty"`
 	MessageTimestamp int64                  `json:"message_timestamp,omitempty" validate:"omitempty"`
 }
 

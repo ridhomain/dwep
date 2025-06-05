@@ -412,3 +412,42 @@ func (r *PostgresRepo) FindMessagesByToPhone(ctx context.Context, ToPhone string
 	}
 	return messages, nil
 }
+
+func (r *PostgresRepo) FindFirstMessageByPhoneNumber(ctx context.Context, phoneNumber string) (*model.Message, error) {
+	companyID, err := tenant.FromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to get tenant ID: %w", apperrors.ErrUnauthorized, err)
+	}
+	loggerCtx := logger.FromContext(ctx)
+
+	var message model.Message
+	operation := func() error {
+		result := r.db.WithContext(ctx).
+			Where("from_user = ? AND company_id = ? AND flow = ?",
+				phoneNumber, companyID, model.MessageFlowIncoming).
+			Order("message_timestamp ASC").
+			First(&message)
+
+		if result.Error != nil {
+			return checkConstraintViolation(result.Error)
+		}
+		return nil
+	}
+
+	readPolicy := newRetryPolicy(ctx, readRetryMaxElapsedTime)
+	startTime := utils.Now()
+	findErr := retryableOperation(ctx, readPolicy, "FindFirstMessageByPhoneNumber", operation)
+	observer.ObserveDbOperationDuration("find_first_by_phone", "message", companyID, time.Since(startTime), findErr)
+
+	if findErr != nil {
+		if errors.Is(findErr, apperrors.ErrNotFound) {
+			return nil, apperrors.ErrNotFound
+		}
+		loggerCtx.Error("Failed to find first message by phone number",
+			zap.String("phone_number", phoneNumber),
+			zap.Error(findErr))
+		return nil, findErr
+	}
+
+	return &message, nil
+}

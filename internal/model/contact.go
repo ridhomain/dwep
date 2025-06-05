@@ -80,8 +80,6 @@ func (c *Contact) BeforeUpdate(tx *gorm.DB) error {
 // Update the ContactUpdateColumns function
 func ContactUpdateColumns() []string {
 	return []string{
-		"phone_number", "type", "custom_name", "notes", "tags", "avatar", "assigned_to", "pob", "dob",
-		"gender", "origin", "push_name", "status", "agent_id", "chat_id",
-		"first_message_id", "first_message_timestamp", "updated_at", "last_metadata",
+		"push_name",
 	}
 }

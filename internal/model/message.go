@@ -57,9 +57,7 @@ func (m *Message) GetUpdatableFields() []string {
 	// List all fields except 'id' and 'created_at'
 	// Ensure these names match the gorm:"column:..." tags
 	return []string{
-		"from_phone", "to_phone", "chat_id", "message_type", "jid", "flow", "key",
-		"status", "message_timestamp", "message_date", "updated_at", "last_metadata",
-		"message_text", "message_url",
+		"status", "updated_at", "last_metadata", "message_text", "message_url", "message_obj", "message_type",
 	}
 }
 
@@ -67,9 +65,7 @@ func MessageUpdatableFields() []string {
 	// List all fields except 'id' and 'created_at'
 	// Ensure these names match the gorm:"column:..." tags
 	return []string{
-		"from_phone", "to_phone", "chat_id", "message_type", "jid", "flow", "key",
-		"status", "message_timestamp", "message_date", "updated_at", "last_metadata",
-		"message_text", "message_url",
+		"status", "last_metadata",
 	}
 }
 

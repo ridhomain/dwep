@@ -200,6 +200,67 @@ var (
 	})
 )
 
+// Bloom filter metrics
+var (
+	bloomFilterChecks = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "onboarding_bloom_filter_checks_total",
+			Help: "Total number of bloom filter checks",
+		},
+		[]string{"company_id", "filter_type", "result"},
+	)
+
+	bloomFilterStats = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "onboarding_bloom_filter_stats",
+			Help: "Bloom filter statistics",
+		},
+		[]string{"company_id", "stat_type"},
+	)
+
+	onboardingCacheFalsePositives = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "onboarding_cache_false_positives_total",
+			Help: "Total number of bloom filter false positives",
+		},
+		[]string{"company_id", "filter_type"},
+	)
+
+	batchProcessorMetrics = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "onboarding_batch_processor_total",
+			Help: "Batch processor operations",
+		},
+		[]string{"company_id", "operation", "status"},
+	)
+
+	batchProcessorDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "onboarding_batch_processor_duration_seconds",
+			Help:    "Batch processor operation duration",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"company_id", "operation"},
+	)
+
+	cacheWarmupDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "onboarding_cache_warmup_duration_seconds",
+			Help:    "Cache warmup duration",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"company_id"},
+	)
+
+	cacheWarmupSize = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "onboarding_cache_warmup_size",
+			Help: "Number of entries loaded during cache warmup",
+		},
+		[]string{"company_id"},
+	)
+)
+
 // --- New Load Generator Metrics ---
 var (
 	loadgenLabels = []string{"subject", "company_id"} // Labels for loadgen metrics
@@ -492,4 +553,34 @@ func IncLoadgenPublishErrors(subject, companyID string) {
 	if Metrics != nil {
 		loadgenPublishErrorsTotal.WithLabelValues(subject, sanitizeTenant(companyID)).Inc()
 	}
+}
+
+// Observer functions
+func IncCacheCheck(companyID, filterType, result string) {
+	bloomFilterChecks.WithLabelValues(companyID, filterType, result).Inc()
+}
+
+func SetBloomFilterStats(companyID string, hitRate, fpRate float64) {
+	bloomFilterStats.WithLabelValues(companyID, "hit_rate").Set(hitRate)
+	bloomFilterStats.WithLabelValues(companyID, "false_positive_rate").Set(fpRate)
+}
+
+func IncBatchProcessorError(companyID, operation string) {
+	batchProcessorMetrics.WithLabelValues(companyID, operation, "error").Inc()
+}
+
+func IncBatchProcessorSuccess(companyID, operation string, count int) {
+	batchProcessorMetrics.WithLabelValues(companyID, operation, "success").Add(float64(count))
+}
+
+func ObserveBatchProcessorDuration(companyID, operation string, duration time.Duration) {
+	batchProcessorDuration.WithLabelValues(companyID, operation).Observe(duration.Seconds())
+}
+
+func ObserveCacheWarmupDuration(companyID string, duration time.Duration) {
+	cacheWarmupDuration.WithLabelValues(companyID).Observe(duration.Seconds())
+}
+
+func SetCacheWarmupSize(companyID string, size int) {
+	cacheWarmupSize.WithLabelValues(companyID).Set(float64(size))
 }

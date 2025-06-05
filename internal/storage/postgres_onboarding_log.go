@@ -209,3 +209,61 @@ func (r *PostgresRepo) FindOnboardingLogsWithinTimeRange(ctx context.Context, st
 	}
 	return logEntries, nil
 }
+
+func (r *PostgresRepo) BulkSaveOnboardingLogs(ctx context.Context, logs []model.OnboardingLog) error {
+	if len(logs) == 0 {
+		return nil
+	}
+
+	companyID, err := tenant.FromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("%w: failed to get tenant ID: %w", apperrors.ErrUnauthorized, err)
+	}
+
+	// Validate all logs belong to the same tenant
+	for i, log := range logs {
+		if log.CompanyID != companyID {
+			return fmt.Errorf("%w: log at index %d has mismatched company ID", apperrors.ErrBadRequest, i)
+		}
+	}
+
+	operation := func() error {
+		tx := r.db.WithContext(ctx).Begin()
+		if tx.Error != nil {
+			return fmt.Errorf("%w: failed to begin transaction: %w", apperrors.ErrDatabase, tx.Error)
+		}
+
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+				panic(r)
+			}
+		}()
+
+		// Batch insert
+		if err := tx.CreateInBatches(&logs, 100).Error; err != nil {
+			tx.Rollback()
+			return checkConstraintViolation(err)
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			return fmt.Errorf("%w: failed to commit bulk save: %w", apperrors.ErrDatabase, err)
+		}
+
+		return nil
+	}
+
+	commitPolicy := newRetryPolicy(ctx, bulkCommitRetryMaxElapsedTime)
+	startTime := utils.Now()
+	commitErr := retryableOperation(ctx, commitPolicy, "BulkSaveOnboardingLogs", operation)
+	observer.ObserveDbOperationDuration("bulk_save", "onboarding_log", companyID, time.Since(startTime), commitErr)
+
+	if commitErr != nil {
+		logger.FromContext(ctx).Error("Failed to bulk save onboarding logs",
+			zap.Int("count", len(logs)),
+			zap.Error(commitErr))
+		return commitErr
+	}
+
+	return nil
+}

@@ -433,7 +433,8 @@ func NewPostgresRepo(dsn string, autoMigrate bool, companyID string) (*PostgresR
 		return nil, fmt.Errorf("failed to connect to default postgres after retries: %w", err)
 	}
 
-	schemaName := fmt.Sprintf("daisi_%s", companyID)
+	// Standardized lower case schema name
+	schemaName := fmt.Sprintf("daisi_%s", strings.ToLower(companyID))
 	logger.Log.Info("Ensuring PostgreSQL schema exists", zap.String("schema", schemaName))
 
 	// Create schema if it doesn't exist - Use %q to quote the identifier
