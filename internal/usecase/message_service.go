@@ -86,7 +86,7 @@ func handleRepositoryError(ctx context.Context, err error, operation string, mes
 }
 
 // ProcessHistoricalMessages processes historical messages in bulk
-func (s *EventService) ProcessHistoricalMessages(ctx context.Context, messages []model.UpsertMessagePayload, metadata *model.LastMetadata) error {
+func (s *EventService) ProcessHistoricalMessages(ctx context.Context, messages []model.UpsertMessagePayload, isLastBatch bool, agentID string, metadata *model.LastMetadata) error {
 	log := logger.FromContext(ctx)
 	start := utils.Now()
 
@@ -241,6 +241,25 @@ func (s *EventService) ProcessHistoricalMessages(ctx context.Context, messages [
 		zap.Int("count", len(dbMessages)),
 		zap.Duration("duration", time.Since(start)),
 	)
+
+	if isLastBatch && agentID != "" {
+		// Schedule sync after 15 minutes
+		log.Info("Scheduling post-scan sync for last batch",
+			zap.String("agent_id", agentID),
+			zap.Int("messages_processed", len(dbMessages)))
+
+		go func() {
+			time.Sleep(15 * time.Minute)
+			syncCtx := context.Background()
+			syncCtx = tenant.WithCompanyID(syncCtx, companyID)
+			syncCtx = logger.WithLogger(syncCtx, log)
+
+			if err := s.SyncContactsPostScan(syncCtx, agentID); err != nil {
+				log.Error("Post-scan sync failed", zap.Error(err))
+			}
+		}()
+	}
+
 	return nil
 }
 
@@ -361,9 +380,10 @@ func (s *EventService) UpsertMessage(ctx context.Context, payload model.UpsertMe
 		return handleRepositoryError(ctx, err, "SaveMessage", message.MessageID) // Pass ctx
 	}
 
+	// After saving message successfully:
 	// --- Post-processing: Submit onboarding task if needed ---
-	// Call the helper function to submit the task, log any submission error but don't fail the upsert
-	if submitErr := s.submitOnboardingTaskIfNeeded(ctx, message, metadataJSON); submitErr != nil {
+	// Pass the payload to access campaign data
+	if submitErr := s.submitOnboardingTaskIfNeeded(ctx, message, &payload, metadataJSON); submitErr != nil {
 		log.Warn("Failed to submit onboarding task after message upsert",
 			zap.String("message_id", message.MessageID),
 			zap.Error(submitErr),
@@ -470,6 +490,10 @@ func (s *EventService) UpdateMessage(ctx context.Context, payload model.UpdateMe
 		message.IsDeleted = payload.IsDeleted
 	}
 
+	if payload.MessageUrl != "" {
+		message.MessageUrl = payload.MessageUrl
+	}
+
 	// Update in repo
 	if err := s.messageRepo.Update(ctx, message); err != nil {
 		log.Error("Failed to update message (Update)",
@@ -492,7 +516,7 @@ func (s *EventService) UpdateMessage(ctx context.Context, payload model.UpdateMe
 // entry and submits the task to the worker pool if required.
 // It performs preliminary checks (flow type, 'from' field) before submission.
 // Returns an error only if there was an issue submitting the task to the pool.
-func (s *EventService) submitOnboardingTaskIfNeeded(ctx context.Context, message model.Message, metadataJSON datatypes.JSON) error {
+func (s *EventService) submitOnboardingTaskIfNeeded(ctx context.Context, message model.Message, payload *model.UpsertMessagePayload, metadataJSON datatypes.JSON) error {
 	log := logger.FromContext(ctx).With(zap.String("checked_message_id", message.MessageID))
 
 	// 1. Perform quick checks: only submit if it's an incoming message with a 'From' field.
@@ -501,15 +525,36 @@ func (s *EventService) submitOnboardingTaskIfNeeded(ctx context.Context, message
 		return nil
 	}
 
+	// Extract campaign data from message if available
+	// This would be populated by the Agent API when it detects a campaign message
+	var isCampaign bool
+	var campaignTags, campaignAssignedTo, campaignOrigin string
+
+	if payload != nil && payload.Campaign != nil && payload.Campaign.IsCampaign {
+		isCampaign = true
+		campaignTags = payload.Campaign.Tags
+		campaignAssignedTo = payload.Campaign.AssignedTo
+		campaignOrigin = payload.Campaign.Origin
+
+		log.Debug("Message identified as campaign message",
+			zap.String("tags", campaignTags),
+			zap.String("assigned_to", campaignAssignedTo),
+			zap.String("origin", campaignOrigin))
+	}
+
 	// Prepare task data
 	// Create a new detached context for the background task
 	taskCtx := context.Background()           // Use a fresh background context
 	taskCtx = logger.WithLogger(taskCtx, log) // Carry logger forward
 
 	taskData := OnboardingTaskData{
-		Ctx:          taskCtx, // Pass the detached context
-		Message:      message,
-		MetadataJSON: metadataJSON,
+		Ctx:                taskCtx,
+		Message:            message,
+		MetadataJSON:       metadataJSON,
+		IsCampaignMessage:  isCampaign,
+		CampaignTags:       campaignTags,
+		CampaignAssignedTo: campaignAssignedTo,
+		CampaignOrigin:     campaignOrigin,
 	}
 
 	// 2. Submit to the worker pool

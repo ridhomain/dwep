@@ -1,3 +1,4 @@
+// internal/usecase/onboarding_worker.go
 package usecase
 
 import (
@@ -23,15 +24,22 @@ import (
 
 // OnboardingTaskData holds the necessary data for an onboarding task.
 type OnboardingTaskData struct {
-	Ctx          context.Context // Context derived for the task, NOT the original request context
+	Ctx          context.Context
 	Message      model.Message
 	MetadataJSON datatypes.JSON
+	// Campaign fields from message payload
+	IsCampaignMessage  bool
+	CampaignTags       string
+	CampaignAssignedTo string
+	CampaignOrigin     string
 }
 
 // IOnboardingWorker defines the interface for the onboarding worker pool.
 type IOnboardingWorker interface {
 	SubmitTask(taskData OnboardingTaskData) error
 	Stop()
+	WarmUpBloomFilter(ctx context.Context, agentID string) error
+	GetBloomFilter() *OnboardingBloomFilter
 }
 
 // OnboardingWorker manages the worker pool for processing onboarding logs.
@@ -39,6 +47,7 @@ type OnboardingWorker struct {
 	pool        *ants.PoolWithFunc
 	contactRepo storage.ContactRepo
 	logRepo     storage.OnboardingLogRepo
+	bloomFilter *OnboardingBloomFilter
 	cfg         config.OnboardingWorkerPoolConfig
 	baseLogger  *zap.Logger
 }
@@ -56,8 +65,9 @@ func NewOnboardingWorker(
 	worker := &OnboardingWorker{
 		contactRepo: contactRepo,
 		logRepo:     logRepo,
+		bloomFilter: NewOnboardingBloomFilter(baseLogger),
 		cfg:         cfg,
-		baseLogger:  baseLogger.Named("onboarding_worker"), // Create a named logger
+		baseLogger:  baseLogger.Named("onboarding_worker"),
 	}
 
 	pool, err := ants.NewPoolWithFunc(cfg.PoolSize, func(i interface{}) {
@@ -69,11 +79,10 @@ func NewOnboardingWorker(
 		worker.processOnboardingTask(taskData)
 	},
 		ants.WithExpiryDuration(cfg.ExpiryTime),
-		ants.WithNonblocking(false), // Make it blocking if queue is full, controlled by MaxBlockTime
+		ants.WithNonblocking(false),
 		ants.WithMaxBlockingTasks(cfg.QueueSize),
 		ants.WithPanicHandler(func(err interface{}) {
 			worker.baseLogger.Error("Panic recovered in onboarding worker", zap.Any("panic_error", err), zap.Stack("stack"))
-			// Potentially increment a panic counter metric here
 		}),
 	)
 	if err != nil {
@@ -89,14 +98,18 @@ func NewOnboardingWorker(
 	return worker, nil
 }
 
+// GetBloomFilter returns the bloom filter instance
+func (w *OnboardingWorker) GetBloomFilter() *OnboardingBloomFilter {
+	return w.bloomFilter
+}
+
 // SubmitTask submits a new onboarding check task to the worker pool.
 func (w *OnboardingWorker) SubmitTask(taskData OnboardingTaskData) error {
 	start := time.Now()
 	observer.IncOnboardingTasksSubmitted(taskData.Message.CompanyID)
-	observer.SetOnboardingQueueLength(w.pool.Waiting()) // Approximate queue length
+	observer.SetOnboardingQueueLength(w.pool.Waiting())
 
-	// Use Invoke with timeout
-	err := w.pool.Invoke(taskData) // Pass task data directly
+	err := w.pool.Invoke(taskData)
 
 	duration := time.Since(start)
 
@@ -108,7 +121,6 @@ func (w *OnboardingWorker) SubmitTask(taskData OnboardingTaskData) error {
 			zap.Error(err),
 		)
 		observer.IncOnboardingTasksProcessed(taskData.Message.CompanyID, "submit_error")
-		// Potentially handle different errors like ants.ErrPoolOverload specifically
 		if errors.Is(err, ants.ErrPoolOverload) {
 			return fmt.Errorf("onboarding pool overload: %w", err)
 		}
@@ -125,28 +137,25 @@ func (w *OnboardingWorker) SubmitTask(taskData OnboardingTaskData) error {
 
 // processOnboardingTask contains the actual logic executed by a worker goroutine.
 func (w *OnboardingWorker) processOnboardingTask(taskData OnboardingTaskData) {
-	// Use the logger derived from the task context if available, otherwise use base logger
 	log := logger.FromContextOr(taskData.Ctx, w.baseLogger).With(
 		zap.String("task_message_id", taskData.Message.MessageID),
 		zap.String("task_company_id", taskData.Message.CompanyID),
 	)
 
 	start := time.Now()
-	status := "success" // Default status for metrics
+	status := "success"
 
-	log.Debug("Processing onboarding task") // Changed from Info to Debug
+	log.Debug("Processing onboarding task")
 
-	// Add tenant ID to the task's context for repository operations
 	taskCtx := tenant.WithCompanyID(taskData.Ctx, taskData.Message.CompanyID)
 
-	// 1. Basic check (already done before submitting, but double-check)
+	// 1. Basic check
 	if taskData.Message.Flow != model.MessageFlowIncoming || taskData.Message.FromPhone == "" {
 		log.Debug("Skipping onboarding task: not applicable message type")
 		observer.IncOnboardingTasksProcessed(taskData.Message.CompanyID, "skipped_not_applicable")
 		return
 	}
 
-	// 2. Clean and validate phone number
 	phoneNumber := cleanPhoneNumber(taskData.Message.FromPhone)
 	if phoneNumber == "" {
 		log.Warn("Skipping onboarding task: empty phone number after cleaning", zap.String("original_from", taskData.Message.FromPhone))
@@ -154,12 +163,40 @@ func (w *OnboardingWorker) processOnboardingTask(taskData OnboardingTaskData) {
 		return
 	}
 
-	var processingErr error // Variable to capture the first critical error
+	var processingErr error
 
-	// 3. Check if contact exists for this phone number AND agent ID
+	// 2. Quick Bloom filter check
+	if w.bloomFilter.MightExist(taskData.Message.CompanyID, taskData.Message.AgentID, phoneNumber) {
+		log.Debug("Contact might be onboarded (bloom filter positive), checking database")
+
+		// Bloom filter says it might exist, need to verify with DB
+		existingLog, err := w.logRepo.FindByPhoneAndAgentID(taskCtx, phoneNumber, taskData.Message.AgentID)
+		if err != nil && !errors.Is(err, apperrors.ErrNotFound) {
+			log.Error("Error checking onboarding log", zap.Error(err))
+			status = "failure_log_check"
+			processingErr = err
+		}
+
+		if processingErr == nil && existingLog != nil {
+			// Confirmed: already onboarded
+			log.Debug("Contact confirmed onboarded, processing campaign update only")
+			if taskData.IsCampaignMessage {
+				w.processCampaignUpdate(taskCtx, taskData, log)
+			}
+			status = "skipped_already_onboarded"
+			observer.IncOnboardingTasksProcessed(taskData.Message.CompanyID, status)
+			return
+		}
+
+		// False positive from bloom filter, continue with onboarding
+		if processingErr == nil {
+			log.Debug("False positive from bloom filter, proceeding with onboarding")
+		}
+	}
+
+	// 3. Check if contact exists
 	existingContact, err := w.contactRepo.FindByPhoneAndAgentID(taskCtx, phoneNumber, taskData.Message.AgentID)
-	if err != nil && !errors.Is(err, apperrors.ErrNotFound) && !errors.Is(err, apperrors.ErrBadRequest) { // Treat NotFound and BadRequest as non-fatal for this step
-		// Log other errors (e.g., database connection issues)
+	if err != nil && !errors.Is(err, apperrors.ErrNotFound) && !errors.Is(err, apperrors.ErrBadRequest) {
 		log.Error("Error checking contact existence by phone and agent",
 			zap.String("phone_number", phoneNumber),
 			zap.String("agent_id", taskData.Message.AgentID),
@@ -167,88 +204,140 @@ func (w *OnboardingWorker) processOnboardingTask(taskData OnboardingTaskData) {
 		status = "failure_contact_check"
 		processingErr = err
 	} else if errors.Is(err, apperrors.ErrBadRequest) {
-		// Handle case where AgentID might be empty if FindByPhoneAndAgentID returns BadRequest for that
-		log.Warn("Skipping onboarding task: Invalid input for contact check (e.g., empty AgentID)",
+		log.Warn("Skipping onboarding task: Invalid input for contact check",
 			zap.String("phone_number", phoneNumber),
 			zap.String("agent_id", taskData.Message.AgentID),
 			zap.Error(err))
 		status = "skipped_invalid_check_input"
-		processingErr = err // Set processingErr to prevent further steps
+		processingErr = err
 	}
 
-	// 4. If no processing error occurred SO FAR and contact DOES NOT exist for this specific phone+agent combo, proceed
-	if processingErr == nil && existingContact == nil {
-		log.Debug("Potential onboarding: Contact not found for this phone and agent combo, creating contact.",
-			zap.String("phone_number", phoneNumber),
-			zap.String("agent_id", taskData.Message.AgentID))
+	// 4. Create or update contact
+	if processingErr == nil {
+		if existingContact == nil {
+			// Create new contact
+			log.Debug("Creating new contact for onboarding",
+				zap.String("phone_number", phoneNumber),
+				zap.String("agent_id", taskData.Message.AgentID))
 
-		contactUUID := uuid.New().String() // Generate a new UUID for the contact ID
-		// 4.1 Create the new contact record
-		newContact := model.Contact{
-			ID:                    contactUUID,
-			PhoneNumber:           phoneNumber,
-			CompanyID:             taskData.Message.CompanyID,
-			FirstMessageID:        taskData.Message.MessageID,        // Link to the message that triggered onboarding
-			FirstMessageTimestamp: taskData.Message.MessageTimestamp, // Link to the message that triggered onboarding
-			Origin:                "onboarding_worker",               // Indicate source
-			AgentID:               taskData.Message.AgentID,          // Assign agent from message if available
-			LastMetadata:          taskData.MetadataJSON,             // Store last known metadata
-		}
-
-		contactSaveErr := w.contactRepo.Save(taskCtx, newContact)
-		if contactSaveErr != nil {
-			// Failed to save the contact
-			log.Error("Error saving new contact during onboarding", zap.Error(contactSaveErr))
-			status = "failure_contact_save"
-			processingErr = contactSaveErr
-			// Do not proceed to log creation if contact save failed
-		} else {
-			log.Info("Successfully created new contact during onboarding", zap.String("contact_id", newContact.ID)) // Log the assigned ID if available
-
-			// 5. Check if an onboarding log ALREADY exists for this message ID (check AFTER successful contact creation)
-			existingLog, logErr := w.logRepo.FindByMessageID(taskCtx, taskData.Message.MessageID)
-			if logErr != nil && !errors.Is(logErr, apperrors.ErrNotFound) { // Treat NotFound as non-fatal here
-				log.Error("Error checking for existing onboarding log after contact creation", zap.Error(logErr))
-				status = "failure_log_check"
-				processingErr = logErr
+			contactUUID := uuid.New().String()
+			newContact := model.Contact{
+				ID:                    contactUUID,
+				PhoneNumber:           phoneNumber,
+				CompanyID:             taskData.Message.CompanyID,
+				FirstMessageID:        taskData.Message.MessageID,
+				FirstMessageTimestamp: taskData.Message.MessageTimestamp,
+				AgentID:               taskData.Message.AgentID,
+				Status:                "ACTIVE",
+				LastMetadata:          taskData.MetadataJSON,
 			}
 
-			// 6. If no existing log found, create a new one
-			if processingErr == nil && existingLog == nil {
+			// Set business data based on message type
+			if taskData.IsCampaignMessage {
+				newContact.Origin = taskData.CampaignOrigin
+				newContact.Tags = taskData.CampaignTags
+				newContact.AssignedTo = taskData.CampaignAssignedTo
+			} else {
+				newContact.Origin = "DirectChat"
+				newContact.Tags = "Onboarded"
+				newContact.AssignedTo = ""
+			}
+
+			contactSaveErr := w.contactRepo.Save(taskCtx, newContact)
+			if contactSaveErr != nil {
+				log.Error("Error saving new contact during onboarding", zap.Error(contactSaveErr))
+				status = "failure_contact_save"
+				processingErr = contactSaveErr
+			} else {
+				log.Info("Successfully created new contact during onboarding", zap.String("contact_id", newContact.ID))
+			}
+		} else {
+			// Update existing contact
+			needsUpdate := false
+			contactToUpdate := *existingContact
+
+			// For campaign messages, ALWAYS update
+			if taskData.IsCampaignMessage {
+				// Merge tags
+				if taskData.CampaignTags != "" {
+					existingTags := strings.Split(existingContact.Tags, ",")
+					newTags := strings.Split(taskData.CampaignTags, ",")
+					mergedTags := mergeTags(existingTags, newTags)
+					contactToUpdate.Tags = strings.Join(mergedTags, ",")
+					needsUpdate = true
+				}
+
+				// Replace AssignedTo
+				if taskData.CampaignAssignedTo != "" {
+					contactToUpdate.AssignedTo = taskData.CampaignAssignedTo
+					needsUpdate = true
+				}
+
+				// Set Origin only if blank
+				if existingContact.Origin == "" && taskData.CampaignOrigin != "" {
+					contactToUpdate.Origin = taskData.CampaignOrigin
+					needsUpdate = true
+				}
+			} else if existingContact.Origin == "" {
+				// Non-campaign message, but contact not fully onboarded
+				contactToUpdate.Origin = "DirectChat"
+				contactToUpdate.Tags = addTagIfMissing(existingContact.Tags, "Onboarded")
+				needsUpdate = true
+			}
+
+			// Set first message fields if not already set
+			if existingContact.FirstMessageID == "" {
+				contactToUpdate.FirstMessageID = taskData.Message.MessageID
+				contactToUpdate.FirstMessageTimestamp = taskData.Message.MessageTimestamp
+				needsUpdate = true
+			}
+
+			// Update if needed
+			if needsUpdate {
+				contactToUpdate.UpdatedAt = time.Now()
+				contactToUpdate.LastMetadata = taskData.MetadataJSON
+
+				if err := w.contactRepo.Update(taskCtx, contactToUpdate); err != nil {
+					log.Error("Error updating contact during onboarding", zap.Error(err))
+					status = "failure_contact_update"
+					processingErr = err
+				} else {
+					log.Info("Successfully updated contact during onboarding")
+				}
+			}
+		}
+
+		// 5. Create onboarding log (ONE TIME ONLY)
+		if processingErr == nil {
+			// Double-check it doesn't already exist
+			existingLog, _ := w.logRepo.FindByPhoneAndAgentID(taskCtx, phoneNumber, taskData.Message.AgentID)
+
+			if existingLog == nil {
 				newLog := model.OnboardingLog{
-					MessageID:   taskData.Message.MessageID,
-					AgentID:     taskData.Message.AgentID,
-					CompanyID:   taskData.Message.CompanyID,
-					PhoneNumber: phoneNumber,
-					Timestamp:   taskData.Message.MessageTimestamp,
-					// CreatedAt is handled by GORM
+					MessageID:    taskData.Message.MessageID,
+					AgentID:      taskData.Message.AgentID,
+					CompanyID:    taskData.Message.CompanyID,
+					PhoneNumber:  phoneNumber,
+					Timestamp:    taskData.Message.MessageTimestamp,
 					LastMetadata: taskData.MetadataJSON,
 				}
 
 				logSaveErr := w.logRepo.Save(taskCtx, newLog)
 				if logSaveErr != nil {
-					// Failed to save the log
 					log.Error("Error saving new onboarding log", zap.Error(logSaveErr))
 					status = "failure_log_save"
 					processingErr = logSaveErr
-					// Note: Contact was already created successfully earlier.
 				} else {
-					log.Info("Successfully created onboarding log") // Keep this as Info
-					// Status remains "success" (overall success for this path)
+					log.Info("Successfully created onboarding log")
+					// Add to bloom filter
+					w.bloomFilter.Add(taskData.Message.CompanyID, taskData.Message.AgentID, phoneNumber)
 				}
-			} else if processingErr == nil {
-				// Log exists, successfully processed (no action needed for log, contact created)
-				log.Debug("Onboarding log already exists for this message, contact was created")
-				status = "skipped_log_exists_contact_created" // More specific status
+			} else {
+				log.Debug("Onboarding log already exists for this contact")
+				// Still add to bloom filter in case it was missing
+				w.bloomFilter.Add(taskData.Message.CompanyID, taskData.Message.AgentID, phoneNumber)
 			}
-		} // End else block for successful contact save
-
-	} else if processingErr == nil {
-		// Contact exists for this phone+agent combo, successfully processed (no action needed)
-		log.Debug("Skipping onboarding: Contact already exists for this phone and agent combo",
-			zap.String("phone_number", phoneNumber),
-			zap.String("agent_id", taskData.Message.AgentID))
-		status = "skipped_contact_exists" // Keep status relatively simple, or make more specific like "skipped_contact_agent_pair_exists"
+		}
 	}
 
 	// Record metrics
@@ -259,14 +348,161 @@ func (w *OnboardingWorker) processOnboardingTask(taskData OnboardingTaskData) {
 	log.Debug("Finished processing onboarding task", zap.Duration("duration", duration), zap.String("final_status", status))
 }
 
+// processCampaignUpdate processes campaign updates for already onboarded contacts
+func (w *OnboardingWorker) processCampaignUpdate(ctx context.Context, taskData OnboardingTaskData, log *zap.Logger) {
+	if !taskData.IsCampaignMessage {
+		return
+	}
+
+	phoneNumber := cleanPhoneNumber(taskData.Message.FromPhone)
+
+	// Get contact from DB
+	contact, err := w.contactRepo.FindByPhoneAndAgentID(ctx, phoneNumber, taskData.Message.AgentID)
+	if err != nil {
+		log.Error("Failed to find contact for campaign update", zap.Error(err))
+		return
+	}
+
+	needsUpdate := false
+
+	// Merge tags
+	if taskData.CampaignTags != "" {
+		existingTags := strings.Split(contact.Tags, ",")
+		newTags := strings.Split(taskData.CampaignTags, ",")
+		mergedTags := mergeTags(existingTags, newTags)
+		contact.Tags = strings.Join(mergedTags, ",")
+		needsUpdate = true
+	}
+
+	// Replace AssignedTo
+	if taskData.CampaignAssignedTo != "" && contact.AssignedTo != taskData.CampaignAssignedTo {
+		contact.AssignedTo = taskData.CampaignAssignedTo
+		needsUpdate = true
+	}
+
+	// Set Origin only if blank
+	if contact.Origin == "" && taskData.CampaignOrigin != "" {
+		contact.Origin = taskData.CampaignOrigin
+		needsUpdate = true
+	}
+
+	if needsUpdate {
+		contact.UpdatedAt = time.Now()
+		contact.LastMetadata = taskData.MetadataJSON
+
+		if err := w.contactRepo.Update(ctx, *contact); err != nil {
+			log.Error("Failed to update contact with campaign data", zap.Error(err))
+		} else {
+			log.Info("Successfully updated contact with campaign data")
+		}
+	}
+}
+
+// WarmUpBloomFilter loads existing onboarding logs into the bloom filter
+func (w *OnboardingWorker) WarmUpBloomFilter(ctx context.Context, agentID string) error {
+	companyID, err := tenant.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	log := logger.FromContext(ctx)
+	const batchSize = 1000
+	offset := 0
+	totalLoaded := 0
+
+	for {
+		// Fetch onboarding logs in batches
+		logs, err := w.logRepo.FindByAgentIDPaginated(ctx, agentID, batchSize, offset)
+		if err != nil {
+			return fmt.Errorf("failed to fetch onboarding logs: %w", err)
+		}
+
+		if len(logs) == 0 {
+			break // No more logs
+		}
+
+		// Extract phone numbers
+		phoneNumbers := make([]string, len(logs))
+		for i, log := range logs {
+			phoneNumbers[i] = log.PhoneNumber
+		}
+
+		// Batch add to bloom filter
+		w.bloomFilter.AddBatch(companyID, agentID, phoneNumbers)
+
+		totalLoaded += len(logs)
+		offset += batchSize
+
+		log.Debug("Loaded batch into bloom filter",
+			zap.Int("batch_size", len(logs)),
+			zap.Int("total_loaded", totalLoaded))
+
+		// If we got less than batch size, we're done
+		if len(logs) < batchSize {
+			break
+		}
+	}
+
+	log.Info("Bloom filter warm-up completed",
+		zap.String("agent_id", agentID),
+		zap.Int("total_contacts", totalLoaded))
+
+	return nil
+}
+
 // cleanPhoneNumber performs basic cleaning.
 func cleanPhoneNumber(phone string) string {
 	cleaned := strings.ReplaceAll(phone, "+", "")
-	cleaned = strings.ReplaceAll(cleaned, "-", "")
+	// cleaned = strings.ReplaceAll(cleaned, "-", "")
 	cleaned = strings.ReplaceAll(cleaned, " ", "")
 	cleaned = strings.ReplaceAll(cleaned, "(", "")
 	cleaned = strings.ReplaceAll(cleaned, ")", "")
 	return cleaned
+}
+
+// mergeTags merges two tag lists, avoiding duplicates
+func mergeTags(existing, new []string) []string {
+	tagMap := make(map[string]bool)
+
+	// Add existing tags
+	for _, tag := range existing {
+		tag = strings.TrimSpace(tag)
+		if tag != "" {
+			tagMap[tag] = true
+		}
+	}
+
+	// Add new tags
+	for _, tag := range new {
+		tag = strings.TrimSpace(tag)
+		if tag != "" {
+			tagMap[tag] = true
+		}
+	}
+
+	// Convert back to slice
+	result := make([]string, 0, len(tagMap))
+	for tag := range tagMap {
+		result = append(result, tag)
+	}
+
+	return result
+}
+
+// addTagIfMissing adds a tag if it doesn't already exist
+func addTagIfMissing(existingTags, newTag string) string {
+	if existingTags == "" {
+		return newTag
+	}
+
+	tags := strings.Split(existingTags, ",")
+	for _, tag := range tags {
+		if strings.TrimSpace(tag) == newTag {
+			return existingTags // Tag already exists
+		}
+	}
+
+	return existingTags + "," + newTag
 }
 
 // Stop gracefully shuts down the worker pool.

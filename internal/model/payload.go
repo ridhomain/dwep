@@ -53,16 +53,27 @@ type UpsertMessagePayload struct {
 	MessageObj       map[string]interface{} `json:"message_obj,omitempty" validate:"omitempty"`
 	Status           string                 `json:"status,omitempty" validate:"omitempty"`
 	MessageTimestamp int64                  `json:"message_timestamp,omitempty" validate:"omitempty"`
+	Campaign         *CampaignData          `json:"campaign,omitempty" validate:"omitempty"`
+}
+
+// CampaignData holds campaign-specific information
+type CampaignData struct {
+	IsCampaign bool   `json:"is_campaign"`
+	Tags       string `json:"tags,omitempty"`
+	AssignedTo string `json:"assigned_to,omitempty"`
+	Origin     string `json:"origin,omitempty"`
 }
 
 type KeyPayload struct {
 	ID        string `json:"id,omitempty" validate:"required"`
-	FromMe    bool   `json:"from_me,omitempty" validate:"omitempty"`
-	RemoteJid string `json:"remote_jid,omitempty" validate:"omitempty"`
+	FromMe    bool   `json:"fromMe,omitempty" validate:"omitempty"`
+	RemoteJid string `json:"remoteJid,omitempty" validate:"omitempty"`
 }
 
 type HistoryMessagePayload struct {
-	Messages []UpsertMessagePayload `json:"messages" validate:"required,dive,required"`
+	Messages    []UpsertMessagePayload `json:"messages" validate:"required,dive,required"`
+	IsLastBatch bool                   `json:"is_last_batch,omitempty"`
+	AgentID     string                 `json:"agent_id,omitempty"`
 }
 
 type UpdateMessagePayload struct {
@@ -71,6 +82,7 @@ type UpdateMessagePayload struct {
 	Status           string                 `json:"status,omitempty" validate:"omitempty"`
 	EditedMessageObj map[string]interface{} `json:"edited_message_obj,omitempty" validate:"omitempty"`
 	IsDeleted        bool                   `json:"is_deleted,omitempty" validate:"omitempty"`
+	MessageUrl       string                 `json:"message_url,omitempty" validate:"omitempty"`
 }
 
 // --- Agent NATS Payload --- //
@@ -87,12 +99,14 @@ type UpsertAgentPayload struct {
 
 // --- Contact NATS Payload --- //
 type UpsertContactPayload struct {
+	ChatID      string `json:"chat_id,omitempty" validate:"required"`
 	PhoneNumber string `json:"phone_number,omitempty" validate:"required"`
 	CompanyID   string `json:"company_id,omitempty" validate:"required"`
 	AgentID     string `json:"agent_id,omitempty" validate:"required"`
 	PushName    string `json:"push_name,omitempty" validate:"required"` // Using pointers to allow partial updates
 }
 
+// UNUSED FOR NOW
 type UpdateContactPayload struct {
 	PhoneNumber string  `json:"phone_number,omitempty" validate:"required"`
 	CompanyID   string  `json:"company_id,omitempty" validate:"required"`

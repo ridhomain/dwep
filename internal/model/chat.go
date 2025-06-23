@@ -11,7 +11,7 @@ import (
 type Chat struct {
 	ID                    int64          `json:"-" gorm:"primaryKey;autoIncrement"`
 	ChatID                string         `json:"id" gorm:"column:chat_id;uniqueIndex"`
-	Jid                   string         `json:"jid,omitempty" gorm:"column:jid;index"`
+	Jid                   string         `json:"jid,omitempty" gorm:"column:jid"`
 	PushName              string         `json:"push_name,omitempty" gorm:"column:push_name"`
 	IsGroup               bool           `json:"is_group,omitempty" gorm:"column:is_group"`
 	GroupName             string         `json:"group_name,omitempty" gorm:"column:group_name"`

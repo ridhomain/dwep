@@ -209,3 +209,81 @@ func (r *PostgresRepo) FindOnboardingLogsWithinTimeRange(ctx context.Context, st
 	}
 	return logEntries, nil
 }
+
+// FindOnboardingLogByPhoneAndAgentID finds a specific onboarding log entry by phone number and agent ID.
+func (r *PostgresRepo) FindOnboardingLogByPhoneAndAgentID(ctx context.Context, phoneNumber, agentID string) (*model.OnboardingLog, error) {
+	companyID, err := tenant.FromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to get tenant ID: %w", apperrors.ErrUnauthorized, err)
+	}
+	loggerCtx := logger.FromContext(ctx)
+
+	var logEntry model.OnboardingLog
+	operation := func() error {
+		result := r.db.WithContext(ctx).Where("phone_number = ? AND agent_id = ? AND company_id = ?", phoneNumber, agentID, companyID).First(&logEntry)
+		if result.Error != nil {
+			return checkConstraintViolation(result.Error)
+		}
+		return nil
+	}
+
+	readPolicy := newRetryPolicy(ctx, readRetryMaxElapsedTime)
+	startTime := utils.Now()
+	findErr := retryableOperation(ctx, readPolicy, "FindOnboardingLogByPhoneAndAgentID", operation)
+	observer.ObserveDbOperationDuration("find_by_phone_agent", "onboarding_log", companyID, time.Since(startTime), findErr)
+
+	if findErr != nil {
+		if errors.Is(findErr, apperrors.ErrNotFound) {
+			return nil, apperrors.ErrNotFound
+		}
+		loggerCtx.Error("Failed to find onboarding log by phone and agent_id after retries",
+			zap.String("phone_number", phoneNumber),
+			zap.String("agent_id", agentID),
+			zap.String("company_id", companyID),
+			zap.Error(findErr))
+		return nil, findErr // Already wrapped
+	}
+	return &logEntry, nil
+}
+
+// FindOnboardingLogsByAgentIDPaginated finds onboarding log entries for a specific agent ID with pagination.
+func (r *PostgresRepo) FindOnboardingLogsByAgentIDPaginated(ctx context.Context, agentID string, limit, offset int) ([]model.OnboardingLog, error) {
+	companyID, err := tenant.FromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to get tenant ID: %w", apperrors.ErrUnauthorized, err)
+	}
+	loggerCtx := logger.FromContext(ctx)
+
+	var logEntries []model.OnboardingLog
+	operation := func() error {
+		result := r.db.WithContext(ctx).
+			Where("agent_id = ? AND company_id = ?", agentID, companyID).
+			Order("created_at ASC").
+			Limit(limit).
+			Offset(offset).
+			Find(&logEntries)
+		if result.Error != nil {
+			return fmt.Errorf("%w: query failed: %w", apperrors.ErrDatabase, result.Error)
+		}
+		return nil // Success, even if no records found
+	}
+
+	readPolicy := newRetryPolicy(ctx, readRetryMaxElapsedTime)
+	startTime := utils.Now()
+	findErr := retryableOperation(ctx, readPolicy, "FindOnboardingLogsByAgentIDPaginated", operation)
+	observer.ObserveDbOperationDuration("find_by_agent_id_paginated", "onboarding_log", companyID, time.Since(startTime), findErr)
+
+	if findErr != nil {
+		loggerCtx.Error("Failed to find onboarding logs by agent_id with pagination after retries",
+			zap.String("agent_id", agentID),
+			zap.String("company_id", companyID),
+			zap.Int("limit", limit),
+			zap.Int("offset", offset),
+			zap.Error(findErr))
+		return nil, findErr // Already wrapped
+	}
+	if logEntries == nil { // Ensure empty slice is returned, not nil
+		return []model.OnboardingLog{}, nil
+	}
+	return logEntries, nil
+}

@@ -92,6 +92,10 @@ func (a *MessageRepoAdapter) FindByMessageID(ctx context.Context, messageID stri
 	return a.postgres.FindMessageByMessageID(ctx, messageID)
 }
 
+func (a *MessageRepoAdapter) FindFirstIncomingMessageByPhoneAndAgent(ctx context.Context, phoneNumber, agentID string) (*model.Message, error) {
+	return a.postgres.FindFirstIncomingMessageByPhoneAndAgent(ctx, phoneNumber, agentID)
+}
+
 // BulkUpsert performs a bulk upsert of messages
 func (a *MessageRepoAdapter) BulkUpsert(ctx context.Context, messages []model.Message) error {
 	return a.postgres.BulkUpsertMessages(ctx, messages)
@@ -138,6 +142,10 @@ func (a *ContactRepoAdapter) FindByPhone(ctx context.Context, phone string) (*mo
 // FindByPhoneAndAgentID finds a contact by phone number and agent ID
 func (a *ContactRepoAdapter) FindByPhoneAndAgentID(ctx context.Context, phone, agentID string) (*model.Contact, error) {
 	return a.postgres.FindContactByPhoneAndAgentID(ctx, phone, agentID)
+}
+
+func (a *ContactRepoAdapter) FindByAgentIDAndEmptyOriginPaginated(ctx context.Context, agentID string, limit, offset int) ([]model.Contact, error) {
+	return a.postgres.FindContactsByAgentIDAndEmptyOriginPaginated(ctx, agentID, limit, offset)
 }
 
 // BulkUpsert performs a bulk upsert of contacts
@@ -233,6 +241,14 @@ func (a *OnboardingLogRepoAdapter) FindByAgentID(ctx context.Context, agentID st
 // FindWithinTimeRange finds onboarding logs within a time range
 func (a *OnboardingLogRepoAdapter) FindWithinTimeRange(ctx context.Context, startTimeUnix, endTimeUnix int64) ([]model.OnboardingLog, error) {
 	return a.postgres.FindOnboardingLogsWithinTimeRange(ctx, startTimeUnix, endTimeUnix)
+}
+
+func (a *OnboardingLogRepoAdapter) FindByPhoneAndAgentID(ctx context.Context, phoneNumber, agentID string) (*model.OnboardingLog, error) {
+	return a.postgres.FindOnboardingLogByPhoneAndAgentID(ctx, phoneNumber, agentID)
+}
+
+func (a *OnboardingLogRepoAdapter) FindByAgentIDPaginated(ctx context.Context, agentID string, limit, offset int) ([]model.OnboardingLog, error) {
+	return a.postgres.FindOnboardingLogsByAgentIDPaginated(ctx, agentID, limit, offset)
 }
 
 // Close closes the repository

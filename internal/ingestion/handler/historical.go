@@ -19,7 +19,7 @@ type HistoricalHandler struct {
 // HistoricalService defines the interface for historical event processing
 type HistoricalService interface {
 	ProcessHistoricalChats(ctx context.Context, chats []model.UpsertChatPayload, metadata *model.LastMetadata) error
-	ProcessHistoricalMessages(ctx context.Context, messages []model.UpsertMessagePayload, metadata *model.LastMetadata) error
+	ProcessHistoricalMessages(ctx context.Context, messages []model.UpsertMessagePayload, isLastBatch bool, agentID string, metadata *model.LastMetadata) error
 	ProcessHistoricalContacts(ctx context.Context, contacts []model.UpsertContactPayload, metadata *model.LastMetadata) error
 }
 
@@ -95,7 +95,7 @@ func (h *HistoricalHandler) handleHistoricalMessages(ctx context.Context, metada
 
 	log.Info("Processing historical messages", zap.Int("count", len(historyMessage.Messages)))
 	// Return error directly from service (already wrapped)
-	return h.service.ProcessHistoricalMessages(ctx, historyMessage.Messages, metadata)
+	return h.service.ProcessHistoricalMessages(ctx, historyMessage.Messages, historyMessage.IsLastBatch, historyMessage.AgentID, metadata)
 }
 
 // handleHistoricalContacts processes historical contact events

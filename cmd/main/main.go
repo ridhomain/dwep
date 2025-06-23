@@ -17,6 +17,7 @@ import (
 	"gitlab.com/timkado/api/daisi-wa-events-processor/internal/jetstream"
 	"gitlab.com/timkado/api/daisi-wa-events-processor/internal/observer"
 	"gitlab.com/timkado/api/daisi-wa-events-processor/internal/storage"
+	"gitlab.com/timkado/api/daisi-wa-events-processor/internal/tenant"
 	"gitlab.com/timkado/api/daisi-wa-events-processor/internal/usecase"
 	"gitlab.com/timkado/api/daisi-wa-events-processor/pkg/logger"
 	"gitlab.com/timkado/api/daisi-wa-events-processor/pkg/utils"
@@ -78,7 +79,7 @@ func main() {
 		cfg.WorkerPools.Onboarding,
 		contactRepo,
 		onboardingLogRepo,
-		logger.Log, // Pass the base logger
+		logger.Log,
 	)
 	if err != nil {
 		logger.Log.Fatal("Failed to initialize onboarding worker pool", zap.Error(err))
@@ -86,6 +87,40 @@ func main() {
 
 	// Create service, injecting the worker pool
 	service := usecase.NewEventService(chatRepo, messageRepo, contactRepo, agentRepo, onboardingLogRepo, exhaustedEventRepo, onboardingWorker)
+
+	logger.Log.Info("Starting bloom filter warm-up for active agents")
+	go func() {
+		ctx := context.Background()
+		ctx = tenant.WithCompanyID(ctx, cfg.Company.ID)
+
+		// Give the system a moment to stabilize
+		time.Sleep(5 * time.Second)
+
+		// Get all agents for this company
+		agents, err := agentRepo.FindByCompanyID(ctx, cfg.Company.ID)
+		if err != nil {
+			logger.Log.Error("Failed to fetch agents for bloom filter warm-up", zap.Error(err))
+			return
+		}
+
+		logger.Log.Info("Found agents for bloom filter warm-up", zap.Int("count", len(agents)))
+
+		// Warm up each agent's bloom filter
+		for _, agent := range agents {
+			logger.Log.Info("Warming up bloom filter for agent",
+				zap.String("agent_id", agent.AgentID),
+				zap.String("agent_name", agent.AgentName))
+
+			if err := onboardingWorker.WarmUpBloomFilter(ctx, agent.AgentID); err != nil {
+				logger.Log.Error("Failed to warm up bloom filter for agent",
+					zap.String("agent_id", agent.AgentID),
+					zap.Error(err))
+				continue
+			}
+		}
+
+		logger.Log.Info("Bloom filter warm-up completed for all agents")
+	}()
 
 	// Create and set up processor - now takes the full config object
 	processor := usecase.NewProcessor(service, jsClient, cfg, cfg.Company.ID)

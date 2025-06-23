@@ -144,28 +144,6 @@ func (r *PostgresRepo) setupCDCForCompany(ctx context.Context, schemaName string
 	return nil
 }
 
-// func (r *PostgresRepo) setupCDCForPartition(ctx context.Context, schemaName string, partitionName string) error {
-// 	// Set REPLICA IDENTITY FULL for the partition
-// 	replicaSQL := fmt.Sprintf("ALTER TABLE %q.%s REPLICA IDENTITY FULL", schemaName, partitionName)
-// 	if err := r.db.WithContext(ctx).Exec(replicaSQL).Error; err != nil {
-// 		return fmt.Errorf("failed to set replica identity for partition: %w", err)
-// 	}
-
-// 	// Add partition to publication
-// 	addToPublicationSQL := fmt.Sprintf(`
-//         ALTER PUBLICATION daisi_pub ADD TABLE %q.%s
-//     `, schemaName, partitionName)
-
-// 	if err := r.db.WithContext(ctx).Exec(addToPublicationSQL).Error; err != nil {
-// 		// Ignore duplicate errors
-// 		if !strings.Contains(err.Error(), "duplicate") {
-// 			return fmt.Errorf("failed to add partition to publication: %w", err)
-// 		}
-// 	}
-
-// 	return nil
-// }
-
 // newRetryPolicy creates a new exponential backoff policy with context awareness.
 func newRetryPolicy(ctx context.Context, maxElapsedTime time.Duration) backoff.BackOffContext {
 	b := backoff.NewExponentialBackOff()
@@ -318,9 +296,7 @@ func ensureMessagePartition(db *gorm.DB, schemaName string, date time.Time) erro
 		return nil
 	}
 
-	// Create partition (relies on search_path for the base 'messages' table)
-	// The partition name itself is unqualified as it will be created in the default schema set by search_path
-	// Explicitly qualify partition name and base table name
+	// Create partition
 	createPartitionSQL := fmt.Sprintf(`
         CREATE TABLE %q.%s PARTITION OF %q.messages
         FOR VALUES FROM ('%s') TO ('%s');
@@ -328,21 +304,21 @@ func ensureMessagePartition(db *gorm.DB, schemaName string, date time.Time) erro
 
 	logger.Log.Info("Creating message partition",
 		zap.String("partitionName", partitionName),
-		zap.String("schema", schemaName), // Log the target schema
+		zap.String("schema", schemaName),
 		zap.String("startDate", startDate.Format("2006-01-02")),
 		zap.String("endDate", endDate.Format("2006-01-02")),
 	)
 
 	if err := db.Exec(createPartitionSQL).Error; err != nil {
-		// Improved error check for concurrent creation (race condition)
+		// Check for concurrent creation (race condition)
 		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "42P07" { // 42P07 = duplicate_table
 			logger.Log.Warn("Message partition creation conflict (likely concurrent creation), assuming exists", zap.String("partitionName", partitionName), zap.String("schema", schemaName))
-			return nil // Treat as success if it already exists due to race condition
+			return nil
 		}
 		// Fallback check for generic "already exists" messages
 		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "duplicate table") {
 			logger.Log.Warn("Message partition creation conflict (already exists string match), assuming exists", zap.String("partitionName", partitionName), zap.String("schema", schemaName))
-			return nil // Treat as success if it already exists
+			return nil
 		}
 		logger.Log.Error("Failed to create message partition",
 			zap.String("partitionName", partitionName),
@@ -357,7 +333,6 @@ func ensureMessagePartition(db *gorm.DB, schemaName string, date time.Time) erro
 		zap.String("partition", partitionName),
 		zap.String("schema", schemaName))
 
-	// Set REPLICA IDENTITY FULL
 	cdcSQL := fmt.Sprintf(`
     DO $$
     BEGIN
@@ -381,8 +356,30 @@ func ensureMessagePartition(db *gorm.DB, schemaName string, date time.Time) erro
 	}
 
 	logger.Log.Info("Successfully created message partition with CDC", zap.String("partitionName", partitionName), zap.String("schema", schemaName))
-
 	return nil
+}
+
+// generatePartitionDates creates a slice of dates for partition creation
+// from the previous year to the ENTIRE current year, by month
+func generatePartitionDates() []time.Time {
+	now := time.Now().UTC()
+	currentYear := now.Year()
+	previousYear := currentYear - 1
+
+	var dates []time.Time
+
+	// Generate all months from previous year (12 months)
+	for month := 1; month <= 12; month++ {
+		dates = append(dates, time.Date(previousYear, time.Month(month), 1, 0, 0, 0, 0, time.UTC))
+	}
+
+	// Generate ALL months from current year (12 months)
+	// Even if we're only in May, create partitions for the whole year
+	for month := 1; month <= 12; month++ {
+		dates = append(dates, time.Date(currentYear, time.Month(month), 1, 0, 0, 0, 0, time.UTC))
+	}
+
+	return dates
 }
 
 // tenantNamer implements gorm schema.Namer interface for multi-tenant schemas
@@ -492,18 +489,6 @@ func NewPostgresRepo(dsn string, autoMigrate bool, companyID string) (*PostgresR
 		return nil, fmt.Errorf("failed to connect to postgres tenant db %s after retries: %w", schemaName, err) // Updated error message
 	}
 
-	// ----> SET SEARCH_PATH HERE <----
-	// setSearchPathSQL := fmt.Sprintf("SET search_path TO %q, public", schemaName)
-	// if err := db.Exec(setSearchPathSQL).Error; err != nil {
-	// 	sqlDB, _ := db.DB()
-	// 	if sqlDB != nil {
-	// 		sqlDB.Close() // Clean up the connection if setting search_path fails
-	// 	}
-	// 	return nil, fmt.Errorf("failed to set search_path for schema %s: %w", schemaName, err)
-	// }
-	// logger.Log.Info("Set search_path for connection", zap.String("schema", schemaName))
-	// ----> END SET SEARCH_PATH <----
-
 	repo := &PostgresRepo{db: db}
 
 	// --- Define DDL for the partitioned messages table ---
@@ -550,14 +535,13 @@ func NewPostgresRepo(dsn string, autoMigrate bool, companyID string) (*PostgresR
 	// but adding manually ensures they exist even if AutoMigrate is off or fails partially.
 	// Note: company_id is not included as indexing is within the tenant-specific schema.
 	indexes := map[string]string{
-		"idx_messages_message_id":        fmt.Sprintf("CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_message_id ON %q.messages USING btree (message_id, message_date);", schemaName),
-		"idx_messages_from_phone":        fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_messages_from ON %q.messages USING btree (from_phone);`, schemaName),
-		"idx_messages_to_phone":          fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_messages_to ON %q.messages USING btree (to_phone);`, schemaName),
-		"idx_messages_chat_id":           fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON %q.messages USING btree (chat_id);", schemaName),
-		"idx_messages_jid":               fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_messages_jid ON %q.messages USING btree (jid);", schemaName),
-		"idx_messages_agent_id":          fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_messages_agent_id ON %q.messages USING btree (agent_id);", schemaName),
-		"idx_messages_message_timestamp": fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_messages_message_timestamp ON %q.messages USING btree (message_timestamp);", schemaName),
-		"idx_messages_message_date":      fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_messages_message_date ON %q.messages USING btree (message_date);", schemaName),
+		"idx_messages_message_id":   fmt.Sprintf("CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_message_id ON %q.messages USING btree (message_id, message_date);", schemaName),
+		"idx_messages_from_phone":   fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_messages_from ON %q.messages USING btree (from_phone);`, schemaName),
+		"idx_messages_to_phone":     fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_messages_to ON %q.messages USING btree (to_phone);`, schemaName),
+		"idx_messages_chat_id":      fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON %q.messages USING btree (chat_id);", schemaName),
+		"idx_messages_jid":          fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_messages_jid ON %q.messages USING btree (jid);", schemaName),
+		"idx_messages_agent_id":     fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_messages_agent_id ON %q.messages USING btree (agent_id);", schemaName),
+		"idx_messages_message_date": fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_messages_message_date ON %q.messages USING btree (message_date);", schemaName),
 	}
 
 	for indexName, indexSQL := range indexes {
@@ -567,9 +551,9 @@ func NewPostgresRepo(dsn string, autoMigrate bool, companyID string) (*PostgresR
 		}
 	}
 
-	// --- Ensure the DEFAULT partition exists ---
-	// This catches any messages that don't fall into a specific monthly partition.
-	// We should check if this default partition exists in the correct schema too.
+	// --- Ensure the DEFAULT partition exists FIRST ---
+	// This catches any messages that don't fall into specific monthly partitions
+	// (like 2023 data, zero timestamps, or other stupid data)
 	defaultPartitionName := "messages_default"
 	var defaultExists bool
 	checkDefaultSQL := `SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = ? AND table_name = ?)`
@@ -582,8 +566,7 @@ func NewPostgresRepo(dsn string, autoMigrate bool, companyID string) (*PostgresR
 	}
 
 	if !defaultExists {
-		logger.Log.Info("Creating default message partition", zap.String("schema", schemaName))
-		// Explicitly qualify partition name and base table name
+		logger.Log.Info("Creating default message partition for stupid data and out-of-range messages", zap.String("schema", schemaName))
 		defaultPartitionSQL := fmt.Sprintf(`CREATE TABLE %q.%s PARTITION OF %q.messages DEFAULT;`, schemaName, defaultPartitionName, schemaName)
 		if err := db.Exec(defaultPartitionSQL).Error; err != nil {
 			// Check for race condition/already exists
@@ -599,6 +582,8 @@ func NewPostgresRepo(dsn string, autoMigrate bool, companyID string) (*PostgresR
 				}
 				return nil, fmt.Errorf("failed to create default partition in schema %s: %w", schemaName, err)
 			}
+		} else {
+			logger.Log.Info("Successfully created default message partition", zap.String("schema", schemaName))
 		}
 	} else {
 		logger.Log.Debug("Default message partition already exists", zap.String("schema", schemaName))
@@ -715,10 +700,10 @@ func NewPostgresRepo(dsn string, autoMigrate bool, companyID string) (*PostgresR
 
 	// Create indexes for contacts table
 	contactsIndexes := map[string]string{
-		"idx_contacts_phone":       fmt.Sprintf("CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_phone ON %q.contacts USING btree (phone_number);", schemaName),
+		"drop_old_chat_id_idx":     fmt.Sprintf("DROP INDEX IF EXISTS %q.idx_contacts_chat_id;", schemaName),
 		"idx_contacts_assigned_to": fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_contacts_assigned_to ON %q.contacts USING btree (assigned_to);", schemaName),
 		"idx_contacts_agent_id":    fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_contacts_agent_id ON %q.contacts USING btree (agent_id);", schemaName),
-		"idx_contacts_chat_id":     fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_contacts_chat_id ON %q.contacts USING btree (chat_id);", schemaName),
+		"idx_contacts_chat_id":     fmt.Sprintf("CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_chat_id ON %q.contacts USING btree (chat_id);", schemaName),
 	}
 	for indexName, indexSQL := range contactsIndexes {
 		if err := db.Exec(indexSQL).Error; err != nil {
@@ -727,18 +712,27 @@ func NewPostgresRepo(dsn string, autoMigrate bool, companyID string) (*PostgresR
 	}
 
 	// --- Ensure necessary monthly partitions exist on startup ---
-	now := time.Now().UTC()
-	for _, date := range []time.Time{
-		now.AddDate(0, -1, 0), // Previous month
-		now,                   // Current month
-		now.AddDate(0, 1, 0),  // Next month
-	} {
-		// Pass schemaName to ensureMessagePartition
+	partitionDates := generatePartitionDates()
+	logger.Log.Info("Creating monthly message partitions for FULL YEARS",
+		zap.Int("total_partitions", len(partitionDates)),
+		zap.String("schema", schemaName),
+		zap.String("range", fmt.Sprintf("%d (12 months) + %d (12 months)", partitionDates[0].Year(), partitionDates[12].Year())))
+
+	for _, date := range partitionDates {
 		if err := ensureMessagePartition(db, schemaName, date); err != nil {
 			// Log partition creation errors but don't fail startup
-			logger.Log.Warn("Failed to ensure message partition exists on startup", zap.Time("date", date), zap.String("schema", schemaName), zap.Error(err))
+			logger.Log.Warn("Failed to ensure message partition exists on startup",
+				zap.Time("date", date),
+				zap.String("schema", schemaName),
+				zap.Error(err))
 		}
 	}
+
+	logger.Log.Info("Message partition setup complete",
+		zap.String("schema", schemaName),
+		zap.Int("monthly_partitions", len(partitionDates)),
+		zap.String("years_covered", fmt.Sprintf("%d-%d", partitionDates[0].Year(), partitionDates[len(partitionDates)-1].Year())),
+		zap.Bool("default_partition_exists", true))
 
 	// CDC auto setup
 	if autoMigrate {

@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	apperrors "gitlab.com/timkado/api/daisi-wa-events-processor/internal/apperrors"
@@ -79,6 +81,7 @@ func (s *EventService) ProcessHistoricalContacts(ctx context.Context, contacts [
 		}
 
 		ctc := model.Contact{
+			ChatID:       contact.ChatID,
 			PhoneNumber:  contact.PhoneNumber,
 			CompanyID:    contact.CompanyID,
 			PushName:     contact.PushName,
@@ -309,6 +312,144 @@ func (s *EventService) UpdateContact(ctx context.Context, payload model.UpdateCo
 	} else {
 		log.Info("No fields to update for contact", zap.String("phone_number", payload.PhoneNumber), zap.String("agent_id", payload.AgentID))
 	}
+
+	return nil
+}
+
+// SyncContactsPostScan syncs contacts after QR code scan with bloom filter optimization
+func (s *EventService) SyncContactsPostScan(ctx context.Context, agentID string) error {
+	companyID, err := tenant.FromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get tenant ID: %w", err)
+	}
+
+	log := logger.FromContext(ctx)
+	const batchSize = 500
+	offset := 0
+	processedCount := 0
+	updatedCount := 0
+	skippedGroupCount := 0
+
+	// Get bloom filter from onboarding worker
+	bloomFilter := s.onboardingWorker.GetBloomFilter()
+
+	for {
+		// Find contacts without Origin (not fully onboarded) in batches
+		contacts, err := s.contactRepo.FindByAgentIDAndEmptyOriginPaginated(ctx, agentID, batchSize, offset)
+		if err != nil {
+			return fmt.Errorf("failed to fetch contacts: %w", err)
+		}
+
+		if len(contacts) == 0 {
+			break // No more contacts
+		}
+
+		for _, contact := range contacts {
+			processedCount++
+
+			// Skip potential groups based on phone number length
+			// WhatsApp group IDs are typically much longer than regular phone numbers
+			// Regular phone numbers: 10-15 digits
+			// Group IDs: 18+ characters
+			cleanedPhone := strings.ReplaceAll(contact.PhoneNumber, "-", "")
+			cleanedPhone = strings.ReplaceAll(cleanedPhone, " ", "")
+			if len(cleanedPhone) > 17 {
+				log.Debug("Skipping potential group contact (long ID)",
+					zap.String("contact_id", contact.ID),
+					zap.String("phone_number", contact.PhoneNumber),
+					zap.Int("phone_length", len(cleanedPhone)))
+				skippedGroupCount++
+				continue
+			}
+
+			// Skip if already in bloom filter (already onboarded)
+			if bloomFilter.MightExist(companyID, agentID, contact.PhoneNumber) {
+				// Double-check with DB to handle false positives
+				existingLog, _ := s.onboardingLogRepo.FindByPhoneAndAgentID(ctx, contact.PhoneNumber, agentID)
+				if existingLog != nil {
+					log.Debug("Contact already onboarded (found in bloom filter and DB), skipping",
+						zap.String("contact_id", contact.ID))
+					continue
+				}
+			}
+
+			// Check if contact has first message IN
+			firstInMsg, err := s.messageRepo.FindFirstIncomingMessageByPhoneAndAgent(ctx, contact.PhoneNumber, contact.AgentID)
+			if err != nil && !errors.Is(err, apperrors.ErrNotFound) {
+				log.Error("Error finding first message",
+					zap.String("contact_id", contact.ID),
+					zap.Error(err))
+				continue
+			}
+
+			if firstInMsg != nil {
+				// Update contact with default onboarding data (Phase 1 - hardcoded)
+				contact.Origin = "DirectChat"
+				contact.Tags = "Onboarded"
+				if contact.AssignedTo == "" {
+					contact.AssignedTo = ""
+				}
+				contact.FirstMessageID = firstInMsg.MessageID
+				contact.FirstMessageTimestamp = firstInMsg.MessageTimestamp
+				contact.UpdatedAt = utils.Now()
+
+				if err := s.contactRepo.Update(ctx, contact); err != nil {
+					log.Error("Failed to update contact in post-scan sync",
+						zap.String("contact_id", contact.ID),
+						zap.Error(err))
+					continue
+				}
+
+				// Create onboarding log
+				newLog := model.OnboardingLog{
+					MessageID:   firstInMsg.MessageID,
+					AgentID:     contact.AgentID,
+					CompanyID:   contact.CompanyID,
+					PhoneNumber: contact.PhoneNumber,
+					Timestamp:   firstInMsg.MessageTimestamp,
+					LastMetadata: utils.MustMarshalJSON(map[string]interface{}{
+						"source":    "post_scan_sync",
+						"synced_at": utils.Now(),
+					}),
+				}
+
+				if err := s.onboardingLogRepo.Save(ctx, newLog); err != nil {
+					log.Error("Failed to save onboarding log in sync",
+						zap.String("contact_id", contact.ID),
+						zap.Error(err))
+				} else {
+					// Add to bloom filter
+					bloomFilter.Add(companyID, agentID, contact.PhoneNumber)
+					updatedCount++
+					log.Info("Successfully onboarded contact in post-scan sync",
+						zap.String("contact_id", contact.ID),
+						zap.String("phone_number", contact.PhoneNumber))
+				}
+			} else {
+				log.Debug("No incoming message found for contact, skipping onboarding",
+					zap.String("contact_id", contact.ID),
+					zap.String("phone_number", contact.PhoneNumber))
+			}
+		}
+
+		offset += batchSize
+
+		log.Debug("Processed batch in post-scan sync",
+			zap.Int("batch_size", len(contacts)),
+			zap.Int("total_processed", processedCount),
+			zap.Int("total_updated", updatedCount),
+			zap.Int("skipped_groups", skippedGroupCount))
+
+		if len(contacts) < batchSize {
+			break
+		}
+	}
+
+	log.Info("Post-scan sync completed",
+		zap.String("agent_id", agentID),
+		zap.Int("processed", processedCount),
+		zap.Int("updated", updatedCount),
+		zap.Int("skipped_groups", skippedGroupCount))
 
 	return nil
 }

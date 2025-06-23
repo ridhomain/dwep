@@ -412,3 +412,44 @@ func (r *PostgresRepo) FindMessagesByToPhone(ctx context.Context, ToPhone string
 	}
 	return messages, nil
 }
+
+// FindFirstIncomingMessageByPhoneAndAgent finds the first incoming message for a phone number and agent combination
+func (r *PostgresRepo) FindFirstIncomingMessageByPhoneAndAgent(ctx context.Context, phoneNumber, agentID string) (*model.Message, error) {
+	companyID, err := tenant.FromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to get tenant ID: %w", apperrors.ErrUnauthorized, err)
+	}
+	loggerCtx := logger.FromContext(ctx)
+
+	var message model.Message
+	operation := func() error {
+		result := r.db.WithContext(ctx).
+			Where("from_phone = ? AND agent_id = ? AND company_id = ? AND flow = ?",
+				phoneNumber, agentID, companyID, model.MessageFlowIncoming).
+			Order("message_timestamp ASC").
+			First(&message)
+		if result.Error != nil {
+			return checkConstraintViolation(result.Error)
+		}
+		return nil
+	}
+
+	readPolicy := newRetryPolicy(ctx, readRetryMaxElapsedTime)
+	startTime := utils.Now()
+	findErr := retryableOperation(ctx, readPolicy, "FindFirstIncomingMessageByPhoneAndAgent", operation)
+	observer.ObserveDbOperationDuration("find_first_incoming", "message", companyID, time.Since(startTime), findErr)
+
+	if findErr != nil {
+		if errors.Is(findErr, apperrors.ErrNotFound) {
+			return nil, apperrors.ErrNotFound
+		}
+		loggerCtx.Error("Failed to find first incoming message after retries",
+			zap.String("phone_number", phoneNumber),
+			zap.String("agent_id", agentID),
+			zap.String("company_id", companyID),
+			zap.Error(findErr))
+		return nil, findErr // Already wrapped
+	}
+
+	return &message, nil
+}

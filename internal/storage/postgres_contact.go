@@ -362,10 +362,10 @@ func (r *PostgresRepo) BulkUpsertContacts(ctx context.Context, contacts []model.
 			}
 		}() // End defer
 
-		// Make sure the unique constraint exists in the DB on (id, company_id)
+		// Make sure the unique constraint exists in the DB on (chat_id)
 		result := tx.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "phone_number"}, {Name: "agent_id"}}, // Conflict target
-			DoUpdates: clause.AssignmentColumns(model.ContactUpdateColumns()),      // Columns to update on conflict
+			Columns:   []clause.Column{{Name: "chat_id"}},                     // Use chat_id as unique constraint
+			DoUpdates: clause.AssignmentColumns(model.ContactUpdateColumns()), // Columns to update on conflict
 		}).Create(&validContacts) // Use the filtered slice
 
 		if result.Error != nil {
@@ -394,4 +394,46 @@ func (r *PostgresRepo) BulkUpsertContacts(ctx context.Context, contacts []model.
 		return commitErr
 	}
 	return nil
+}
+
+// FindContactsByAgentIDAndEmptyOriginPaginated finds contacts for a specific agent with empty origin field (not onboarded).
+func (r *PostgresRepo) FindContactsByAgentIDAndEmptyOriginPaginated(ctx context.Context, agentID string, limit, offset int) ([]model.Contact, error) {
+	companyID, err := tenant.FromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to get tenant ID: %w", apperrors.ErrUnauthorized, err)
+	}
+	loggerCtx := logger.FromContext(ctx)
+
+	var contacts []model.Contact
+	operation := func() error {
+		result := r.db.WithContext(ctx).
+			Where("agent_id = ? AND company_id = ? AND (origin IS NULL OR origin = '')", agentID, companyID).
+			Order("created_at ASC").
+			Limit(limit).
+			Offset(offset).
+			Find(&contacts)
+		if result.Error != nil {
+			return fmt.Errorf("%w: query failed: %w", apperrors.ErrDatabase, result.Error)
+		}
+		return nil // Success, even if no records found
+	}
+
+	readPolicy := newRetryPolicy(ctx, readRetryMaxElapsedTime)
+	startTime := utils.Now()
+	findErr := retryableOperation(ctx, readPolicy, "FindContactsByAgentIDAndEmptyOriginPaginated", operation)
+	observer.ObserveDbOperationDuration("find_by_agent_empty_origin", "contact", companyID, time.Since(startTime), findErr)
+
+	if findErr != nil {
+		loggerCtx.Error("Failed to find contacts by agent_id with empty origin after retries",
+			zap.String("agent_id", agentID),
+			zap.String("company_id", companyID),
+			zap.Int("limit", limit),
+			zap.Int("offset", offset),
+			zap.Error(findErr))
+		return nil, findErr // Already wrapped
+	}
+	if contacts == nil { // Ensure empty slice is returned, not nil
+		return []model.Contact{}, nil
+	}
+	return contacts, nil
 }

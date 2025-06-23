@@ -29,6 +29,7 @@ type MessageRepo interface {
 	FindBySender(ctx context.Context, sender string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error)
 	FindByFromPhone(ctx context.Context, FromPhone string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error)
 	FindByToPhone(ctx context.Context, ToPhone string, startDate, endDate time.Time, limit int, offset int) ([]model.Message, error)
+	FindFirstIncomingMessageByPhoneAndAgent(ctx context.Context, phoneNumber, agentID string) (*model.Message, error)
 
 	Close(ctx context.Context) error
 }
@@ -40,6 +41,7 @@ type ContactRepo interface {
 	FindByID(ctx context.Context, id string) (*model.Contact, error)
 	FindByPhone(ctx context.Context, phone string) (*model.Contact, error)
 	FindByPhoneAndAgentID(ctx context.Context, phone, agentID string) (*model.Contact, error)
+	FindByAgentIDAndEmptyOriginPaginated(ctx context.Context, agentID string, limit, offset int) ([]model.Contact, error)
 	BulkUpsert(ctx context.Context, contacts []model.Contact) error
 	Close(ctx context.Context) error
 }
@@ -64,6 +66,8 @@ type OnboardingLogRepo interface {
 	FindByPhoneNumber(ctx context.Context, phoneNumber string) ([]model.OnboardingLog, error)
 	FindByAgentID(ctx context.Context, agentID string) ([]model.OnboardingLog, error)
 	FindWithinTimeRange(ctx context.Context, startTimeUnix, endTimeUnix int64) ([]model.OnboardingLog, error)
+	FindByPhoneAndAgentID(ctx context.Context, phoneNumber, agentID string) (*model.OnboardingLog, error)
+	FindByAgentIDPaginated(ctx context.Context, agentID string, limit, offset int) ([]model.OnboardingLog, error)
 	Close(ctx context.Context) error
 }
 

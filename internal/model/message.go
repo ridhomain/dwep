@@ -31,7 +31,7 @@ type Message struct {
 	Key              datatypes.JSON `json:"key,omitempty" gorm:"type:jsonb;column:key"`
 	Status           string         `json:"status,omitempty" gorm:"column:status"`
 	IsDeleted        bool           `json:"is_deleted,omitempty" gorm:"column:is_deleted;default:false"`
-	MessageTimestamp int64          `json:"message_timestamp,omitempty" gorm:"column:message_timestamp;index"`
+	MessageTimestamp int64          `json:"message_timestamp,omitempty" gorm:"column:message_timestamp"`
 	MessageDate      time.Time      `gorm:"column:message_date;type:date;not null"`
 	CreatedAt        time.Time      `json:"created_at,omitempty" gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt        time.Time      `json:"updated_at,omitempty" gorm:"column:updated_at;autoUpdateTime"`
